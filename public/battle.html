@@ -1,0 +1,1478 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Battle Prototype</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#080a0c">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="R6 Autobattler">
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* Tokens mirror app/globals.css (terminal green + amber accent) */
+  :root {
+    --bg: hsl(220 20% 4%);
+    --card: hsl(220 18% 7%);
+    --fg: hsl(140 60% 70%);
+    --hi: hsl(140 30% 88%);
+    --primary: hsl(140 70% 55%);
+    --muted: hsl(140 18% 42%);
+    --accent: hsl(36 90% 55%);
+    --danger: hsl(0 70% 55%);
+    --enemy: hsl(0 65% 68%);
+    --border: hsl(140 30% 18%);
+    --r-common: hsl(140 15% 58%);
+    --r-rare: hsl(205 85% 62%);
+    --r-epic: hsl(280 70% 70%);
+    --r-legendary: hsl(36 90% 55%);
+  }
+  html { font-size: clamp(14px, min(100dvh / 26, 100vw / 54), 21px); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; overflow: hidden; overscroll-behavior: none; background: var(--bg); color: var(--fg); }
+  body { font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 1rem; line-height: 1.2;
+    -webkit-tap-highlight-color: transparent; user-select: none; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  .crt { pointer-events: none; position: fixed; inset: 0; z-index: 90;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,.07) 2px, rgba(0,0,0,.07) 4px),
+                radial-gradient(ellipse at center, transparent 62%, rgba(0,0,0,.45) 100%); }
+  .op { display: block; }
+  .op svg { width: 100%; height: 100%; display: block; }
+  .op svg path:not([fill]) { fill: hsl(140 35% 13%); }
+  .theirs .op svg path:not([fill]) { fill: hsl(0 35% 13%); }
+
+  .app { position: relative; height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: .3rem;
+    padding: max(.5rem, env(safe-area-inset-top)) max(.8rem, env(safe-area-inset-right)) max(.5rem, env(safe-area-inset-bottom)) max(.8rem, env(safe-area-inset-left)); }
+
+  /* ---------- HUD ---------- */
+  .hud { display: flex; align-items: center; gap: .8rem; }
+  .tm { display: flex; align-items: center; gap: .45rem; }
+  .tm b { font-size: 1.3rem; line-height: 1; }
+  .tm.a b, .tm.a .pips { color: var(--primary); } .tm.b b, .tm.b .pips { color: var(--enemy); }
+  .who { font-size: .86rem; font-weight: 700; letter-spacing: .12em; color: var(--muted); }
+  .pips { display: flex; gap: .2rem; } .pips i { width: .5rem; height: .9rem; background: currentColor; border-radius: 1px; transition: opacity .3s; }
+  .pips i.x { opacity: .18; }
+  .rd { flex: 1; text-align: center; font-size: .86rem; font-weight: 700; letter-spacing: .2em; color: var(--hi); white-space: nowrap; }
+  .rd.clutch { color: var(--accent); }
+  .ctl { height: 2rem; padding: 0 .4rem; font-size: .86rem; font-weight: 700; letter-spacing: .1em; color: var(--muted); }
+  .ctl.on { color: var(--accent); }
+
+  /* ---------- Site schematic: each team holds a site; fights happen where the routes meet ---------- */
+  .arena { position: relative; min-height: 0; }
+  .map { position: absolute; inset: 0; }
+  .lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .lines .site { stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .lines .site.a { fill: hsl(140 70% 55% / .05); stroke: hsl(140 50% 35% / .6); }
+  .lines .site.b { fill: hsl(0 70% 55% / .05); stroke: hsl(0 45% 40% / .6); }
+  .lines .route { fill: none; stroke: var(--border); stroke-width: 1; stroke-dasharray: 4 6; vector-effect: non-scaling-stroke; }
+  .slbl { position: absolute; transform: translate(-50%, 0); font-size: .86rem; font-weight: 700; letter-spacing: .14em; white-space: nowrap; pointer-events: none; }
+  .slbl.a { color: hsl(140 40% 40%); } .slbl.b { color: hsl(0 40% 50%); }
+
+  .grp { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: row; align-items: center; gap: .25rem; }
+  .grp.a { flex-direction: row-reverse; } /* zone tab on the outer side: yours left, theirs right */
+  .grp .row { display: flex; gap: .75rem; padding-right: .55rem; } /* room for each card's magazine bar */
+  .zl { font-size: .86rem; font-weight: 700; letter-spacing: .08em; white-space: nowrap; line-height: 1; writing-mode: vertical-rl; transform: rotate(180deg); }
+  .grp.a .zl { color: var(--primary); } .grp.b .zl { color: var(--enemy); }
+  .ghost { width: calc(var(--tw) * .8); height: calc(var(--tw) * .8 + 3.2rem); border: 1px dashed hsl(0 0% 45% / .5); border-radius: 2px; display: grid; place-items: center;
+    font-size: .86rem; font-weight: 700; letter-spacing: .1em; color: var(--muted); }
+
+  .tile { --rc: var(--r-common); --c: var(--primary); position: relative; width: var(--tw); display: flex; flex-direction: column; align-items: center; gap: .15rem;
+    transition: transform .22s cubic-bezier(.3,1.6,.5,1), filter .25s, opacity .25s; }
+  .tile.theirs { --c: var(--enemy); }
+  .tile .em { position: relative; width: 100%; aspect-ratio: 5 / 4; padding: 8% 20% 12%; border-radius: 2px; background: color-mix(in srgb, var(--c) 14%, hsl(220 15% 11%));
+    border: 1px solid color-mix(in srgb, var(--c) 30%, var(--border)); border-top: 3px solid var(--rc); transition: box-shadow .22s; }
+  .tile .em .op { width: 100%; height: 100%; color: var(--c); }
+  /* The gun, held low and pointing at the other team */
+  .tile .gun { position: absolute; bottom: 2%; left: 50%; transform: translateX(-50%); height: auto; fill: hsl(220 10% 82%); z-index: 2; pointer-events: none;
+    filter: invert(.86) drop-shadow(0 0 1px hsl(220 20% 5%)) drop-shadow(0 0 1px hsl(220 20% 5%)); } /* sprites are black: flip them light, then a dark outline */
+  .tile svg.gun.drawn { filter: drop-shadow(0 0 1px hsl(220 20% 5%)) drop-shadow(0 0 1px hsl(220 20% 5%)); }
+  .tile.theirs .gun { transform: translateX(-50%) scaleX(-1); }
+  .tile.firing .gun { animation: recoil .12s ease-out; }
+  .tile.reloading .gun { opacity: .35; rotate: 25deg; transition: rotate .15s, opacity .15s; }
+  .tile.reloading .em::after { content: 'RELOAD'; position: absolute; left: 0; right: 0; bottom: 30%; text-align: center; font-size: .75rem; font-weight: 700; letter-spacing: .08em; color: var(--accent); text-shadow: 0 0 .25rem #000; z-index: 3; }
+  @keyframes recoil { 50% { translate: -3px 0; rotate: -4deg; } }
+  .tile.theirs.firing .gun { animation-name: recoil-b; }
+  @keyframes recoil-b { 50% { translate: 3px 0; rotate: -4deg; } }
+  .flash-m { position: absolute; z-index: 6; width: .9rem; height: .9rem; transform: translate(-50%, -50%); pointer-events: none; border-radius: 50%;
+    background: radial-gradient(circle, hsl(48 100% 85%) 0 25%, hsl(36 100% 55% / .8) 45%, transparent 70%); animation: mflash .09s ease-out forwards; }
+  @keyframes mflash { from { scale: 1.3; } to { scale: .4; opacity: 0; } }
+  /* HP bar with the live number in it */
+  .hpb { position: relative; display: block; width: 100%; height: .95rem; background: hsl(220 15% 16%); border-radius: 1px; overflow: hidden; }
+  .hpb i { display: block; height: 100%; width: 100%; background: color-mix(in srgb, var(--c) 60%, hsl(220 15% 16%)); transition: width .3s ease, background .3s; }
+  .hpb b { position: absolute; inset: 0; display: grid; place-items: center; font-size: .86rem; line-height: 1; font-weight: 700; color: var(--hi); text-shadow: 0 0 .25rem #000, 0 0 .1rem #000; }
+  /* Base stats under the name: damage per bullet and RPM. Everything else is in the tap popup. */
+  .stw { width: 100%; display: flex; justify-content: center; overflow: hidden; }
+  .st { display: inline-flex; gap: .3rem; letter-spacing: -.02em; white-space: nowrap; font-size: .86rem; line-height: 1.1; color: var(--muted); transform-origin: center; }
+  .st span { display: inline-flex; align-items: center; gap: .08rem; } .st b { color: var(--fg, var(--hi)); font-weight: 700; }
+  .st svg { width: .6rem; height: .6rem; flex: none; fill: none; stroke: currentColor; stroke-width: 2; }
+  .tile.dead .hpb b, .tile.dead .st { opacity: .5; }
+  .hpb i.low { background: var(--accent); }
+  .dmg { position: absolute; z-index: 7; pointer-events: none; transform: translate(-50%, -50%); font-weight: 700; font-size: 1.15rem; color: var(--hi); white-space: nowrap;
+    text-shadow: 0 0 .4rem #000, 0 0 .2rem #000; animation: dmgUp .8s ease-out forwards; }
+  .dmg.hs { font-size: 1.35rem; color: var(--accent); letter-spacing: .06em; }
+  .dmg.miss { font-size: .86rem; color: var(--muted); }
+  .dmg.heal { color: var(--primary); }
+  .dmg.burn { font-size: .86rem; color: hsl(22 95% 60%); }
+  .arena.ot { box-shadow: inset 0 0 6rem hsl(36 90% 40% / .35); }
+  @keyframes dmgUp { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.7); } 15% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); } 30% { transform: translate(-50%, -60%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -130%); } }
+  .tile .nmw { width: calc(100% + .3rem); display: flex; justify-content: center; overflow: hidden; }
+  .nm { display: inline-block; white-space: nowrap; font-weight: 700; font-size: .95rem; line-height: 1.1; color: var(--hi); transform-origin: center; }
+  /* Magazine: thin vertical bar just outside the right edge of the square, drains with each burst and refills over the reload */
+  .magb { position: absolute; right: -8px; top: 0; bottom: 0; width: 4px; background: hsl(220 15% 18%); border-radius: 1px; overflow: hidden; z-index: 2; }
+  .magb i { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; background: hsl(220 10% 72%); transition: height .12s linear, background .2s; }
+  .magb.low i { background: var(--accent); }
+  .tile.dead .magb { visibility: hidden; }
+  .ticks { position: absolute; top: .3rem; right: .3rem; display: flex; gap: .2rem; }
+  .ticks i { width: .5rem; height: .5rem; background: var(--accent); transform: rotate(45deg); animation: tick .35s cubic-bezier(.3,1.8,.5,1); }
+  @keyframes tick { from { transform: rotate(45deg) scale(3); opacity: 0; } }
+
+  .tile.firing { z-index: 3; transform: scale(1.06); } .tile.firing .em { box-shadow: 0 0 0 1px var(--c), 0 0 1rem color-mix(in srgb, var(--c) 50%, transparent); }
+  .tile.aim { z-index: 3; transform: scale(1.1); } .tile.aim .em { box-shadow: 0 0 0 2px var(--accent), 0 0 1.6rem hsl(36 90% 55% / .55); }
+  .tile.marked .em::before { content: ""; position: absolute; inset: -.35rem; border: 2px solid var(--danger); border-radius: 2px; pointer-events: none;
+    -webkit-mask: linear-gradient(#000 0 0) top left / 30% 30% no-repeat, linear-gradient(#000 0 0) top right / 30% 30% no-repeat, linear-gradient(#000 0 0) bottom left / 30% 30% no-repeat, linear-gradient(#000 0 0) bottom right / 30% 30% no-repeat;
+            mask: linear-gradient(#000 0 0) top left / 30% 30% no-repeat, linear-gradient(#000 0 0) top right / 30% 30% no-repeat, linear-gradient(#000 0 0) bottom left / 30% 30% no-repeat, linear-gradient(#000 0 0) bottom right / 30% 30% no-repeat;
+    animation: lock .22s ease-out; }
+  @keyframes lock { from { inset: -1.4rem; opacity: 0; } }
+  .tile.flash .em { filter: brightness(2.6) saturate(0); }
+  .tile.dead { filter: grayscale(1) brightness(.4); }
+  .tile.dead .em::after { content: ""; position: absolute; inset: 0; background: linear-gradient(-45deg, transparent 47%, var(--danger) 47% 53%, transparent 53%); }
+  .tile.solo .em { box-shadow: 0 0 0 2px var(--accent), 0 0 2rem hsl(36 90% 55% / .5); }
+  .tile.buffed .em { animation: buffed .6s ease-out; }
+  @keyframes buffed { 0% { box-shadow: 0 0 0 2px var(--c), 0 0 1.6rem color-mix(in srgb, var(--c) 60%, transparent); } 100% { box-shadow: none; } }
+  .arena.clutch .tile:not(.dead):not(.solo):not(.aim) { opacity: .75; }
+
+  .fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 4; }
+  .fx line { stroke-linecap: round; filter: drop-shadow(0 0 4px currentColor); }
+  .fx line.miss { filter: none; opacity: .55; }
+  .pt { position: absolute; z-index: 5; width: .4rem; height: .4rem; pointer-events: none; border-radius: 1px; }
+  /* Gadget: icon in the emblem's top-left; greys out once used or destroyed */
+  .gd { position: absolute; top: 4%; left: 4%; width: 28%; aspect-ratio: 1; z-index: 2; display: grid; place-items: center; border-radius: 2px;
+    background: hsl(220 20% 6% / .75); transition: opacity .3s, filter .3s; }
+  .gd img, .gd svg { width: 86%; height: 86%; object-fit: contain; }
+  .gd svg { fill: none; stroke: hsl(0 0% 95%); stroke-width: 1.6; }
+  .gd.spent { opacity: .3; filter: grayscale(1); }
+  .gd.ping { animation: gping .5s ease-out; }
+  @keyframes gping { 0% { transform: scale(1.8); box-shadow: 0 0 0 2px var(--accent); } 100% { transform: scale(1); } }
+  .gcall { position: absolute; z-index: 6; pointer-events: none; transform: translate(-50%, -50%); display: flex; align-items: center; gap: .3rem; font-size: .86rem; font-weight: 700;
+    letter-spacing: .06em; white-space: nowrap; padding: .12rem .45rem .12rem .2rem; border-radius: 2px; background: hsl(220 20% 8% / .92); color: var(--hi);
+    border: 1px solid var(--accent); animation: callout 1s ease-out forwards; }
+  .gcall.bad { border-color: var(--danger); color: var(--danger); }
+  .gcall i { width: 1.15rem; height: 1.15rem; display: grid; place-items: center; } .gcall i img, .gcall i svg { width: 100%; height: 100%; object-fit: contain; }
+  .gcall i svg { fill: none; stroke: currentColor; stroke-width: 1.6; }
+  .tile.revealed .em { outline: 1px dashed var(--accent); outline-offset: 2px; }
+  .tile.conc .em { animation: conc .5s ease-in-out 3; }
+  @keyframes conc { 50% { transform: rotate(-4deg) translateX(-2px); } }
+  .lines .site { transition: stroke-width .3s; }
+  .lines .site.walled { stroke-width: 3; stroke-dasharray: none; }
+  .smokecloud { position: absolute; z-index: 5; width: var(--sz); height: var(--sz); transform: translate(-50%, -50%); pointer-events: none; border-radius: 50%;
+    background: radial-gradient(circle, hsl(220 10% 75% / .45), hsl(220 10% 60% / .25) 45%, transparent 70%); animation: smoke 3s ease-out forwards; }
+  @keyframes smoke { 0% { opacity: 0; scale: .3; } 12% { opacity: 1; scale: 1; } 80% { opacity: 1; } 100% { opacity: 0; scale: 1.15; } }
+  .callout { position: absolute; z-index: 6; pointer-events: none; transform: translate(-50%, -50%); font-size: .86rem; font-weight: 700; letter-spacing: .08em; white-space: nowrap;
+    padding: .15rem .45rem; border-radius: 2px; background: var(--accent); color: var(--bg); animation: callout 1s ease-out forwards; }
+  @keyframes callout { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.6); } 15% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); } 25% { transform: translate(-50%, -50%) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -110%); } }
+  .floater { position: absolute; z-index: 6; pointer-events: none; transform: translate(-50%, -50%); font-weight: 700; font-size: 1.1rem; white-space: nowrap; animation: floatUp 1s ease-out forwards; }
+  .floater.good { color: var(--primary); } .floater.bad { color: var(--enemy); }
+  @keyframes floatUp { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.8); } 15% { opacity: 1; transform: translate(-50%, -50%) scale(1.15); } 100% { opacity: 0; transform: translate(-50%, -160%); } }
+
+  .band { position: absolute; z-index: 8; left: -.8rem; right: -.8rem; top: 50%; translate: 0 -50%; padding: .8rem 0; pointer-events: none;
+    display: grid; place-items: center; gap: .2rem; background: hsl(220 18% 6% / .96); border-block: 1px solid var(--accent); animation: band 1.3s ease-out forwards; }
+  .band span { font-size: clamp(1.4rem, 8vh, 3rem); font-weight: 700; letter-spacing: .3em; padding-left: .3em; color: var(--accent); white-space: nowrap; line-height: 1; }
+  .band small { font-size: .86rem; letter-spacing: .2em; color: var(--muted); font-weight: 700; }
+  .band.won { border-color: var(--primary); } .band.won span { color: var(--primary); }
+  .band.lost { border-color: var(--danger); } .band.lost span { color: var(--danger); }
+  @keyframes band { 0% { opacity: 0; transform: scaleY(0); } 14% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; } }
+
+  /* ---------- Result + recap ---------- */
+  .result { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; background: var(--bg); }
+  .result .box { display: grid; gap: .9rem; justify-items: center; text-align: center; animation: pop .35s ease-out; }
+  .result h1 { font-size: clamp(2rem, 12vh, 4.4rem); line-height: 1; letter-spacing: .25em; padding-left: .25em; color: var(--primary); text-shadow: 0 0 2rem hsl(140 70% 55% / .35); }
+  .result.loss h1 { color: var(--danger); text-shadow: 0 0 2rem hsl(0 70% 55% / .35); }
+  .rec { display: flex; gap: 2.2rem; }
+  .rec > span { display: grid; gap: .25rem; justify-items: center; }
+  .rec small { font-size: .86rem; font-weight: 700; letter-spacing: .14em; color: var(--muted); }
+  .rec b { font-size: 1.3rem; color: var(--hi); }
+  .lives { display: flex; gap: .25rem; padding-top: .2rem; } .lives i { width: .6rem; height: 1.1rem; background: var(--danger); border-radius: 1px; } .lives i.x { background: var(--border); }
+  .lives i.now { animation: lifeOut 1.2s ease-out both; } .lives em { font-style: normal; font-weight: 700; color: var(--danger); margin-left: .3rem; line-height: 1.1rem; }
+  @keyframes lifeOut { from { background: var(--danger); } }
+  .kills { display: flex; gap: .5rem; }
+  .kp { display: grid; justify-items: center; gap: .15rem; width: 4.2rem; }
+  .kp .op { width: 2.2rem; height: 2.2rem; color: var(--primary); }
+  .kp .nmw { width: 100%; display: flex; justify-content: center; overflow: hidden; } .kp .nm { font-size: .86rem; }
+  .kp em { font-style: normal; font-size: .86rem; font-weight: 700; color: var(--muted); }
+  .kp.mvp em { color: var(--accent); } .kp.mvp .op { filter: drop-shadow(0 0 .6rem hsl(36 90% 55% / .6)); }
+  .kp.dead .op { opacity: .4; }
+  .why { font-size: .9rem; color: var(--hi); max-width: 30rem; } .why b { color: var(--accent); }
+  /* Scoreboard (STATS): replaces the record and kill row */
+  .board { display: none; border-collapse: collapse; font-size: clamp(.86rem, 3.7vh, 1.4rem); }
+  .result.stats .board { display: table; } .result.stats .rec, .result.stats .kills { display: none; }
+  .result.stats h1 { font-size: clamp(1.4rem, 7vh, 2.4rem); }
+  .board th { font-weight: 700; letter-spacing: .12em; color: var(--muted); padding: .6em 1em .2em; text-align: right; }
+  .board th:first-child { text-align: left; color: var(--hi); }
+  .board td { padding: .18em 1em; text-align: right; color: var(--fg); font-variant-numeric: tabular-nums; }
+  .board td.sbname { display: flex; align-items: center; gap: .5em; text-align: left; white-space: nowrap; }
+  .board .itc { text-align: left; white-space: nowrap; } .board .itn { color: var(--muted); }
+  .board td.sbname .op { width: 1.3em; height: 1.3em; color: var(--primary); }
+  .board tr.dead td { opacity: .55; } .board tr.mvp td:nth-child(2) { color: var(--accent); font-weight: 700; }
+  .result .acts { display: flex; gap: .5rem; }
+  .result #newRunBtn.on { border-color: var(--accent); color: var(--accent); } /* END RUN waiting for the second tap */
+  .btn { height: 2.4rem; padding: 0 1rem; border: 1px solid var(--border); border-radius: 2px; font-size: .86rem; font-weight: 700; letter-spacing: .14em; }
+  .btn.go { background: var(--primary); border-color: var(--primary); color: var(--bg); }
+  @keyframes pop { from { transform: scale(.85); opacity: 0; } }
+
+  .pop { position: fixed; z-index: 85; width: min(16rem, calc(100vw - 1rem)); background: hsl(220 18% 6%); border: 1px solid var(--accent); border-radius: 2px; padding: .5rem .65rem; display: grid; gap: .25rem; }
+  .pop b { color: var(--hi); } .pop .ln { font-size: .86rem; color: var(--muted); } .pop .ln b { color: var(--fg); }
+  .pop .ph { display: flex; align-items: baseline; gap: .5rem; } .pop .ph b { font-size: 1.05rem; } .pop .mut { color: var(--muted); font-size: .86rem; }
+  .pop .pst { display: flex; flex-wrap: wrap; gap: .2rem .6rem; font-size: .86rem; color: var(--muted); }
+  .pop .pst span { display: inline-flex; align-items: center; gap: .15rem; } .pop .pst b { color: var(--fg); font-weight: 600; }
+  .pop .pst svg { width: .7rem; height: .7rem; fill: none; stroke: currentColor; stroke-width: 1.6; }
+  body.paused .rd::after { content: ' · PAUSED'; color: var(--accent); }
+
+  .rotate { display: none; position: fixed; inset: 0; place-items: center; color: var(--hi); letter-spacing: .25em; font-weight: 700; }
+  @media (orientation: portrait) { .app, .result, .pop { display: none !important; } .rotate { display: grid; } }
+  .elsewhere { position: fixed; inset: 0; z-index: 999; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 94%, transparent); }
+  .elsewhere > div { display: flex; flex-direction: column; align-items: center; gap: .7rem; text-align: center; }
+  .elsewhere .btn { height: 2.6rem; padding: 0 1.2rem; border: 1px solid var(--primary); background: var(--primary); color: var(--bg); font-weight: 700; letter-spacing: .14em; cursor: pointer; }
+  .elsewhere b { color: var(--accent); letter-spacing: .15em; font-size: 1.1rem; } .elsewhere span { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="crt" aria-hidden="true"></div>
+
+<main class="app">
+  <header class="hud">
+    <div class="tm a" id="sA"></div>
+    <div class="rd" id="rd"></div>
+    <div class="tm b" id="sB"></div>
+    <button class="ctl on" id="sndBtn">SFX</button>
+    <button class="ctl" id="pauseBtn" title="Pause (space)">❚❚</button>
+    <button class="ctl" id="speedBtn" title="Fast forward">▶▶ 1×</button>
+  </header>
+  <section class="arena" id="arena">
+    <div class="map" id="map"></div>
+    <svg class="fx" id="fx"></svg>
+    <div class="band" id="band" hidden></div>
+  </section>
+</main>
+
+<div class="result" id="result" hidden></div>
+<div class="pop" id="pop" hidden></div>
+<div class="rotate">ROTATE YOUR DEVICE</div>
+
+<script>
+// One run per account (the browser stands in for the account until there are logins).
+// The page opened last owns the run; any other open page locks so two pages can't overwrite each other.
+const PAGE_ID = Math.random().toString(36).slice(2);
+let NOT_OWNER = false;
+try { localStorage.setItem('battler.owner', PAGE_ID); } catch {}
+addEventListener('storage', e => {
+  if (e.key !== 'battler.owner' || e.newValue === PAGE_ID || NOT_OWNER) return;
+  NOT_OWNER = true;
+  if (typeof setPaused === 'function') setPaused(true);   // battle: freeze the fight
+  const d = document.createElement('div');
+  d.className = 'elsewhere';
+  d.innerHTML = '<div><b>RUN OPEN ELSEWHERE</b><span>Your run is open in another tab or window.</span><button class="btn go">PLAY HERE</button></div>';
+  d.querySelector('button').onclick = () => location.reload();
+  document.body.appendChild(d);
+});
+
+const SVG = {};
+const OP_NAMES = { kaid:'Kaid', caveira:'Caveira', solis:'Solis', ela:'Ela', ash:'Ash', thermite:'Thermite', hibana:'Hibana', ace:'Ace', blackbeard:'Blackbeard', buck:'Buck', dokkaebi:'Dokkaebi', mute:'Mute',
+  smoke:'Smoke', thatcher:'Thatcher', lesion:'Lesion', vigil:'Vigil', jager:'Jäger', twitch:'Twitch', grim:'Grim', nomad:'Nomad', deimos:'Deimos', azami:'Azami', warden:'Warden', goyo:'Goyo' };
+// Weapon class per gun (same source), and a simple side-on silhouette per class, barrel pointing right
+const GUN_TYPE = { 'SR-25': 'DMR', 'Mk 14 EBR': 'DMR', 'MP5K': 'SMG', 'FMG-9': 'SMG', 'T-5 SMG': 'SMG', 'K1A': 'SMG', '9x19VSN': 'SMG', 'MPX': 'SMG',
+  'Vector .45 ACP': 'SMG', 'AUG A3': 'SMG', 'M12': 'SMG', 'P90': 'SMG', 'Scorpion EVO 3 A1': 'SMG', 'P9': 'SMG' };
+const GUN_SVG = {
+  AR:  [64, '<path d="M1 7h13v6l-9 3H1z"/><rect x="14" y="5" width="26" height="7"/><rect x="18" y="3" width="15" height="2"/><rect x="40" y="6" width="12" height="5"/><rect x="52" y="7.5" width="11" height="2"/><path d="M28 12h6l-1 7-6-1z"/><path d="M18 12h5l-2 6h-5z"/>'],
+  SMG: [46, '<path d="M1 7h13v2H8v3H1z"/><rect x="14" y="5" width="22" height="7"/><rect x="36" y="7.5" width="9" height="2"/><rect x="27" y="12" width="4" height="7"/><path d="M17 12h5l-2 6h-5z"/>'],
+  DMR: [70, '<path d="M1 7h12v6l-8 3H1z"/><rect x="13" y="5" width="25" height="7"/><rect x="17" y="0.5" width="16" height="3.5" rx="1"/><rect x="38" y="6" width="15" height="5"/><rect x="53" y="7.5" width="16" height="2"/><rect x="25" y="12" width="5" height="5"/><path d="M17 12h5l-2 6h-5z"/>'],
+};
+// The real weapon sprites R6 Manager ships (out/weapons). Drawn shapes above are the fallback for guns with no sprite.
+// [file, width, height] of each trimmed sprite (weapons/, cut from out/weapons with the empty canvas removed)
+const GUN_FILE = {".44 Mag Semi-Auto":[".44_Mag_Semi-Auto",128,74],".44 Vendetta":["44VENDETTA",141,93],"1911 TACOPS":["1911_TACOPS",98,68],"416-C Carbine":["416-C_Carbine",192,73],"417":["417",240,70],"5.7 USG":["5.7_USG",103,74],"552 Commando":["552_Commando",244,78],"556XI":["556xi",240,72],"6P41":["6P41",273,76],"9mm C1":["9mm_C1",278,67],"9x19VSN":["9x19VSN",174,76],"ACS12":["ACS12_PB",210,76],"AK-12":["AK-12",246,74],"AK-74M":["AK-74M",202,74],"ALDA 5.56":["ALDA_5.56",272,66],"AR-15.50":["AR-15.50",226,74],"AR33":["AR33",266,74],"ARX200":["ARX200",250,72],"AUG A2":["AUG_A2",197,72],"AUG A3":["AUG_A3",194,73],"BOSG.12.2":["BOSG.12.2",273,62],"Bailiff 410":["Bailiff_410",92,73],"Bearing 9":["Bearing_9",153,90],"C75 Auto":["C75_Auto",86,75],"C7E":["C7E",244,71],"C8-SFW":["C8-SFW",207,75],"CAMRS":["CAMRS",278,61],"CSRX 300":["CSRX_300",217,52],"Commando 9":["Commando_9",184,74],"D-50":["D-50",132,76],"DP27":["Primary_gun_DP27",290,52],"F2":["F2",190,72],"F90":["F2000",214,94],"FMG-9":["FMG-9",152,73],"FO-12":["FO-12",138,76],"G36C":["G36C",171,74],"G8A1":["G8A1",270,64],"GSh-18":["GSh-18",99,78],"ITA12L":["ITA12L",280,64],"ITA12S":["ITA12S",186,75],"K1A":["K1A",202,73],"Keratos .357":["Keratos_.357",119,76],"L85A2":["L85A2",218,74],"LFP586":["LFP586",144,78],"LMG-E":["LMG-E",158,70],"Luison":["Luison",178,74],"M1014":["M1014",280,59],"M12":["M12",199,74],"M249":["M249",262,71],"M249 SAW":["M249_SAW",272,74],"M4":["M4",234,72],"M45 MEUSOC":["M45_MEUSOC",108,74],"M590A1":["M590A1",280,58],"M762":["M762",236,72],"M870":["M870",264,71],"MP5":["MP5",186,74],"MP5K":["MP5K",196,92],"MP5SD":["MP5SD",204,77],"MP7":["MP7",151,71],"MPX":["MPX",148,74],"Mk 14 EBR":["Mk_14_EBR",264,58],"Mk1 9mm":["Mk1_9mm_BI",110,77],"Mk17 CQB":["Mk17_CQB",218,74],"Mx4 Storm":["Mx4_Storm",185,74],"OTs-03":["OTs-03",268,66],"P-10C":["P-10C",90,76],"P12":["P12",111,77],"P226 Mk 25":["P226_Mk_25",95,73],"P229":["P229",107,78],"P9":["P9",99,76],"P90":["P90",182,74],"PARA-308":["PARA-308",244,76],"PCX-33":["pcx-33",234,67],"PDW9":["PDW9",134,76],"PMM":["PMM",96,76],"PMR90A2":["PMR90A2",268,56],"POF-9":["POF9",258,84],"PRB92":["PRB92",114,78],"Q-929":["Q-929",111,76],"R4-C":["R4-C",214,75],"RG15":["RG15",86,77],"Reaper MK2":["reaper-mk2",90,100],"SASG-12":["SASG-12",224,68],"SC3000K":["F2000",214,94],"SDP 9mm":["SDP_9mm",117,94],"SG-CQB":["SG-CQB",280,63],"SIX12":["SIX12",218,74],"SIX12 SD":["SIX12_SD",224,74],"SMG-11":["SMG-11",142,76],"SMG-12":["SMG-12",152,74],"SPAS-12":["SPAS-12",280,56],"SPAS-15":["SPAS-15",260,74],"SPSMG9":["SPSMG9",132,76],"SR-25":["SR-25",282,67],"Scorpion EVO 3 A1":["Scorpion_EVO_3_A1",230,74],"Spear .308":["Spear_.308",180,76],"Super 90":["Super_90",270,72],"SuperNova":["SuperNova",278,60],"T-5 SMG":["T-5_SMG",136,77],"T-95 LSW":["T-95_LSW",186,76],"TCSG12":["TCSG12",185,73],"TYPE-89":["Type-89",276,71],"UMP45":["UMP45",151,78],"USP40":["USP40",104,77],"UZK50Gi":["uzk50gi",224,65],"V308":["V308",198,74],"Vector .45 ACP":["Vector_.45_ACP",134,78]};
+const gunSvg = gun => { const [w, p] = GUN_SVG[GUN_TYPE[gun] || 'AR']; return `<svg class="gun drawn" viewBox="0 0 ${w} 20" style="width:calc(var(--tw) * ${(w / 125).toFixed(3)})">${p}</svg>`; };
+// Every gun is drawn at the same pixel scale, so a rifle is longer than an SMG, and centred under the player
+const gunIcon = gun => {
+  const g = GUN_FILE[gun]; if (!g) return gunSvg(gun);
+  return `<img class="gun" src="weapons/${encodeURIComponent(g[0])}.png" alt="${esc(gun)}" style="width:calc(var(--tw) * ${(g[1] / 470).toFixed(3)})" onerror="this.outerHTML=gunSvg(this.alt)">`;
+};
+// [armor, default primary, damage per bullet, real RPM, class], from R6 Manager's operator data (src/core/data/operators.ts)
+const OPS = {
+  ash: [1, 'R4-C', 39, 860, 'AR'], thermite: [2, '556XI', 43, 690, 'AR'], hibana: [1, 'TYPE-89', 40, 850, 'AR'], ace: [2, 'AK-12', 45, 850, 'AR'],
+  blackbeard: [2, 'SR-25', 72, 260, 'DMR'], buck: [2, 'C8-SFW', 40, 837, 'AR'], dokkaebi: [2, 'Mk 14 EBR', 60, 450, 'DMR'], mute: [2, 'MP5K', 30, 800, 'SMG'],
+  smoke: [2, 'FMG-9', 34, 800, 'SMG'], thatcher: [2, 'AR33', 40, 749, 'AR'], lesion: [2, 'T-5 SMG', 28, 900, 'SMG'], vigil: [2, 'K1A', 36, 720, 'SMG'],
+  jager: [2, '416-C Carbine', 38, 740, 'AR'], twitch: [2, 'F2', 37, 980, 'AR'], grim: [2, '552 Commando', 43, 690, 'AR'], nomad: [2, 'AK-74M', 44, 650, 'AR'],
+  deimos: [2, 'AK-74M', 44, 650, 'AR'], azami: [2, '9x19VSN', 34, 750, 'SMG'], warden: [2, 'MPX', 26, 830, 'SMG'], goyo: [2, 'Vector .45 ACP', 21, 1200, 'SMG'],
+  kaid: [3, 'AUG A3', 33, 760, 'SMG'], caveira: [1, 'M12', 36, 550, 'SMG'], solis: [2, 'P90', 22, 970, 'SMG'], ela: [1, 'Scorpion EVO 3 A1', 23, 1080, 'SMG'],
+};
+// Every primary in R6 Manager's data: [type, damage, RPM (0 = pump or bolt action), magazine]
+const WEAPONS = {"L85A2":["AR",47,670,31],"AR33":["AR",40,749,26],"G36C":["AR",38,780,31],"R4-C":["AR",39,860,31],"556XI":["AR",43,690,31],"F2":["AR",37,980,26],"AK-12":["AR",45,850,31],"AUG A2":["AR",38,750,31],"552 Commando":["AR",43,690,26],"416-C Carbine":["AR",38,740,26],"C8-SFW":["AR",40,837,31],"Mk17 CQB":["AR",48,585,21],"PARA-308":["AR",48,650,31],"TYPE-89":["AR",40,850,21],"C7E":["AR",46,800,31],"M762":["AR",45,730,26],"V308":["AR",44,700,51],"Spear .308":["AR",42,700,31],"M4":["AR",44,750,31],"AK-74M":["AR",44,650,31],"ARX200":["AR",47,700,21],"F90":["AR",38,780,31],"Commando 9":["AR",36,780,26],"SC3000K":["AR",45,860,26],"POF-9":["AR",35,740,51],"PCX-33":["AR",36,800,31],"FMG-9":["SMG",34,800,26],"MP5K":["SMG",30,800,21],"UMP45":["SMG",38,600,26],"MP5":["SMG",27,800,31],"P90":["SMG",22,970,51],"9x19VSN":["SMG",34,750,31],"MP7":["SMG",32,900,31],"9mm C1":["SMG",45,575,34],"MPX":["SMG",26,830,31],"M12":["SMG",36,550,31],"MP5SD":["SMG",27,800,31],"PDW9":["SMG",34,800,51],"Vector .45 ACP":["SMG",21,1200,26],"T-5 SMG":["SMG",28,900,31],"Scorpion EVO 3 A1":["SMG",23,1080,41],"K1A":["SMG",36,720,31],"Mx4 Storm":["SMG",26,950,26],"AUG A3":["SMG",33,760,31],"UZK50Gi":["SMG",44,700,21],"6P41":["LMG",46,680,101],"G8A1":["LMG",37,850,51],"M249":["LMG",48,650,61],"T-95 LSW":["LMG",43,650,81],"LMG-E":["LMG",44,730,151],"ALDA 5.56":["LMG",35,900,81],"M249 SAW":["LMG",48,650,61],"DP27":["LMG",49,550,71],"417":["DMR",69,450,21],"OTs-03":["DMR",72,200,11],"CAMRS":["DMR",69,450,21],"SR-25":["DMR",72,260,21],"Mk 14 EBR":["DMR",60,450,21],"AR-15.50":["DMR",72,450,11],"CSRX 300":["DMR",122,0,6],"PMR90A2":["DMR",47,260,11],"M590A1":["SG",48,0,7],"M1014":["SG",34,0,9],"SG-CQB":["SG",53,0,7],"SASG-12":["SG",50,180,9],"M870":["SG",60,0,8],"Super 90":["SG",35,300,9],"SPAS-12":["SG",50,0,7],"SPAS-15":["SG",30,300,7],"SuperNova":["SG",55,0,7],"ITA12L":["SG",50,0,9],"SIX12":["SG",35,200,6],"SIX12 SD":["SG",35,200,6],"FO-12":["SG",25,400,9],"BOSG.12.2":["SG",125,0,2],"ACS12":["SG",69,300,9],"TCSG12":["SG",57,0,6],"SMG-11":["MP",35,1270,17],"Bearing 9":["MP",33,1100,26],"C75 Auto":["MP",35,1000,20],"SMG-12":["MP",25,1270,34],"SPSMG9":["MP",35,1000,16],"Reaper MK2":["MP",33,900,35]};
+// Range comes from where a player stands: Entry and Anchor fight up close, Flank and Roam at mid range, Support from long.
+// Automatic fire also sprays rounds that never reach the target (pre-fire, suppression), so magazines run dry mid-fight
+let SPRAY = 2.2;
+const RANGE = { Entry: 'close', Anchor: 'close', Flank: 'mid', Roam: 'mid', Support: 'long' };
+// What each type is good at: hit chance and damage by range, reload time, headshots. pump = shots per minute for pump/bolt guns.
+const TYPES = {
+  AR:  { name: 'Rifle',          reload: 2400, hit: { close: 0,    mid: 0,    long: 0 } },
+  SMG: { name: 'SMG',            reload: 2000, hit: { close: .06,  mid: 0,    long: -.08 } },
+  MP:  { name: 'Machine pistol', reload: 1700, hit: { close: .05,  mid: -.03, long: -.12 } },
+  LMG: { name: 'LMG',            reload: 4500, hit: { close: -.04, mid: 0,    long: .02 } },
+  DMR: { name: 'Marksman',       reload: 2600, hit: { close: -.06, mid: 0,    long: .06 }, hs: 1.4, pump: 60 },
+  SG:  { name: 'Shotgun',        reload: 3000, hit: { close: .12,  mid: -.08, long: -.2 }, dmg: { close: 1.35, mid: .85, long: .5 }, pump: 70 },
+};
+// Attachments stay on the gun they were bought for; a new gun comes bare. One of each.
+const ATTACH = {
+  ext:  { name: 'Extended Mag', info: '+50% mag size.' },
+  comp: { name: 'Compensator',  info: '+5% hit chance.' },
+  acog: { name: 'ACOG',         info: '+6% hit at range. -4% up close.' },
+  grip: { name: 'Angled Grip',  info: 'First shot 80ms faster.' },
+};
+// Gear is permanent and stacks: buy as many as you like. Scaling gear grows between battles (n = stacks so far).
+const GEAR = {
+  kevlar:   { name: 'Kevlar Vest',   info: '+32 HP. From the 3rd vest, also -5% RPM.' },
+  plate:    { name: 'Ceramic Plate', info: '+10 armor (blocks 10 damage per bullet). -15% fire damage. -2.5% RPM.' },
+  hollow:   { name: 'Hollow Points', info: '+40% damage. Armor blocks double.' },
+  momentum: { name: 'Momentum',      info: '+15% damage per kill.' },
+  blood:    { name: 'Bloodthirst',   info: 'Heal 30 HP per kill.' },
+  fresh:    { name: 'Fresh Mag',     info: '+20% damage on the first half of each mag.' },
+  wind:     { name: 'Second Wind',   info: 'Below 50% HP: heal 35 and +40% RPM. Once per fight.' },
+  revenge:  { name: 'Revenge',       info: '+35% damage for 3s when a teammate dies.' },
+  spons:    { name: 'Sponsorship',   info: 'Earns credits. No combat effect.' },
+  thick:    { name: 'Thick Skin',    info: 'Takes 10% less damage, plus 4% less per hit taken (max 60%). Half as strong vs Shred.' },
+  shred:    { name: 'Shred Rounds',  info: "Hits also deal 8% of the target's max HP. Halves Thick Skin. One per player." },
+  cond:     { name: 'Conditioning',  base: 12, scale: 8,  info: '+12 HP. +8 more each battle.' },
+  vet:      { name: 'Veteran',       base: 2,  scale: .75, info: '+2 damage. +3 more every 4 kills.' },
+  iron:     { name: 'Iron Wall',     base: 1,  scale: .75, info: '+1 armor. +3 more every 4 battles survived.' },
+};
+// Role passives: a shared pool per role (3 each). Prep picks one per player from their real stats; strength scales with rarity.
+// Self passives (Entry, Anchor, Flank, Roam) are full strength in their own zone and half elsewhere; team calls work from anywhere,
+// and the same call doesn't stack (best one counts). 'ramp' passives build up during the battle and reset after it.
+const ROLE_MULT = { common: 1, rare: 1.33, epic: 1.67, legendary: 2 };
+const pct = v => Math.round(v * 100) + '%';
+const ROLE_PASSIVES = {
+  aim:       { role: 'IGL',     name: 'Aim Discipline', team: true, v: 0.013,  info: v => `Team +${pct(v)} hit chance.` },
+  reload:    { role: 'IGL',     name: 'Reload Drills',  team: true, v: 0.3,  info: v => `Team reloads ${pct(v)} faster.` },
+  tempo:     { role: 'IGL',     name: 'Tempo',          team: true, v: .04,  ramp: true, info: v => `Team +${pct(v)} RPM per team kill.` },
+  lurker:    { role: 'Roam',    name: 'Lurker',         v: 0.12,  ramp: true, info: v => `+${pct(v)} damage per second in a fight (max 5s).` },
+  hunter:    { role: 'Roam',    name: 'Hunter',         v: 0.2,   ramp: true, info: v => `+${pct(v)} damage per team kill.` },
+  ghost:     { role: 'Roam',    name: 'Ghost',          v: 0.08,  info: v => `${pct(v)} of shots at them miss.` },
+  first:     { role: 'Entry',   name: 'First Contact',  v: 0.15,  info: v => `+${pct(v)} RPM for the first 2s.` },
+  flash:     { role: 'Entry',   name: 'Flash Hands',    v: 0.1,  info: v => `Their first target misses ${pct(v)} more for 2s.` },
+  space:     { role: 'Entry',   name: 'Space Maker',    v: 0.08,  info: v => `When they die, team +${pct(v)} hit on their killer.` },
+  hold:      { role: 'Anchor',  name: 'Hold',           v: 6,    info: v => `+${Math.round(v)} armor until first hit.` },
+  digin:     { role: 'Anchor',  name: 'Dig In',         v: 1.5,   ramp: true, info: v => `+${v.toFixed(1)} armor per second in a fight (max 8s).` },
+  lastline:  { role: 'Anchor',  name: 'Last Line',      v: .1,   info: v => `+${pct(v)} damage while 3+ teammates are alive.` },
+  medic:     { role: 'Support', name: 'Medic',          team: true, v: .3,  info: v => `Team heals +${pct(v)}.` },
+  quarter:   { role: 'Support', name: 'Quartermaster',  team: true, v: 1,   info: v => `Team gadgets get +${Math.floor(v)} charge${Math.floor(v) > 1 ? 's' : ''}.` },
+  ammo:      { role: 'Support', name: 'Ammo Runner',    team: true, v: 0.3, info: v => `Team magazines +${pct(v)}.` },
+  crossfire: { role: 'Flank',   name: 'Crossfire',      v: 0.2,  info: v => `+${pct(v)} hit on enemies fighting someone else.` },
+  pincer:    { role: 'Flank',   name: 'Pincer',         v: 0.18,  info: v => `+${pct(v)} damage while your Roam is alive.` },
+  pressure:  { role: 'Flank',   name: 'Pressure',       v: .05,  ramp: true, info: v => `+${pct(v)} damage per burst fired (max 8).` },
+  fill:      { role: 'Flex',    name: 'Fill',           v: .75,  info: v => `Copies a missing role's passive at ${pct(v)}.` },
+  glue:      { role: 'Flex',    name: 'Glue',           team: true, v: 4,   info: v => `Team +${Math.round(v)} HP.` },
+  adapt:     { role: 'Flex',    name: 'Adaptable',      v: .03,  info: v => `+${pct(v)} hit and +${pct(v)} damage.` },
+};
+// Recurring scaling (kept all run, grows between battles):
+//  Mastery: every battle a player plays makes their role passive stronger.
+//  Duos: two roles fighting together build stacks every battle they both play; stacks stay if the pair splits up.
+const MASTERY = { per: .08, cap: 10 };
+const DUOS = [
+  { id: 'call',  a: 'IGL',    b: 'Entry',   to: ['Entry'],         short: 'CP', name: 'Called Push',  per: .03,  cap: 8, info: v => `Entry +${pct(v)} damage.` },
+  { id: 'trade', a: 'Entry',  b: 'Support', to: ['Entry'],         short: 'TK', name: 'Trade Kit',    per: 8,    cap: 8, info: v => `Entry +${Math.round(v)} HP.` },
+  { id: 'fort',  a: 'Anchor', b: 'Support', to: ['Anchor'],        short: 'FT', name: 'Fortified',    per: 1,    cap: 8, info: v => `Anchor +${Math.round(v)} armor.` },
+  { id: 'hunt',  a: 'Flank',  b: 'Roam',    to: ['Flank', 'Roam'], short: 'HP', name: 'Hunting Pair', per: .015, cap: 8, info: v => `Flank and Roam +${pct(v)} hit chance.` },
+];
+// Trinkets: team-wide and permanent. Every 3rd round you pick 1 of 3; later picks come from better tiers.
+// Stat keys (battle): hit, mag, hp, armor, rpm, dmg, rp (role passive strength), heal (team heals per team kill), banner (dmg per win).
+// Run keys (prep): income (¢ per round), mastery (extra per battle), duo (stacks added to every duo when picked).
+const TRINKETS = [
+  { id: 'comms',   tier: 1, short: 'COMMS',  name: 'Comms Headset', hit: .03,          desc: 'Team +3% hit chance.' },
+  { id: 'spare',   tier: 1, short: 'AMMO',   name: 'Spare Mags',    mag: .5,           desc: 'Team +50% mag size.' },
+  { id: 'pouch',   tier: 1, short: 'POUCH',  name: 'Med Pouch',     hp: 8,             desc: 'Team +8 HP.' },
+  { id: 'range',   tier: 1, short: 'RANGE',  name: 'Range Time',    dmg: .05,          desc: 'Team +5% damage.' },
+  { id: 'piggy',   tier: 1, short: 'PIGGY',  name: 'Piggy Bank',    income: 1,         desc: '+¢1 per round.' },
+  { id: 'supply',  tier: 2, short: 'ARMOR',  name: 'Armor Supply',  armor: 4,          desc: 'Team +4 armor.' },
+  { id: 'surgeon', tier: 2, short: 'MEDIC',  name: 'Field Surgeon', heal: 20,          desc: 'Each team kill heals everyone 20 HP.' },
+  { id: 'drill',   tier: 2, short: 'DRILL',  name: 'Drill Sergeant', mastery: 1,       desc: '2 mastery per battle instead of 1.' },
+  { id: 'chest',   tier: 2, short: 'CHEST',  name: 'War Chest',     income: 3,         desc: '+¢3 per round.' },
+  { id: 'chem',    tier: 2, short: 'CHEM',   name: 'Team Chemistry', duo: 3,           desc: '+3 stacks to every duo.' },
+  { id: 'invest',  tier: 2, short: 'INVEST', name: 'Org Investment', invest: 2,      desc: '+¢2 per round, +¢2 more each round (max ¢10).' },
+  { id: 'banner',  tier: 3, short: 'BANNER', name: 'Team Banner',   banner: .02,       desc: 'Team +2% damage per win.' },
+  { id: 'over',    tier: 3, short: 'OVERCLK', name: 'Overclock',    rpm: .12,          desc: 'Team +12% RPM.' },
+  { id: 'crates',  tier: 3, short: 'CRATES', name: 'Kevlar Crates', hp: 20,            desc: 'Team +20 HP.' },
+  { id: 'head',    tier: 3, short: 'HEADCO', name: 'Head Coach',    rp: .6,            desc: 'Role passives 60% stronger.' },
+  { id: 'scopes',  tier: 3, short: 'SCOPES', name: 'Tac Scopes',    hit: .06,          desc: 'Team +6% hit chance.' },
+  { id: 'cracked', tier: 4, short: 'CRACKED', name: 'Cracked',      dmg: .25,          desc: 'Team +25% damage.' },
+  { id: 'jugg',    tier: 4, short: 'JUGG',   name: 'Juggernaut Kit', armor: 4, hp: 20, desc: 'Team +4 armor, +20 HP.' },
+  { id: 'golden',  tier: 4, short: 'GOLDEN', name: 'Golden Hands',  rpm: .2, mag: .5,  desc: 'Team +20% RPM, +50% mag size.' },
+  { id: 'dynasty', tier: 4, short: 'DYNASTY', name: 'Dynasty',      banner: .03, income: 3, desc: 'Team +3% damage per win. +¢3 per round.' },
+  { id: 'legend',  tier: 4, short: 'LEGEND', name: 'Legend Status', rp: 1.2,           desc: 'Role passives 120% stronger.' },
+];
+const TRK_EVERY = 3;
+const trkTier = round => Math.min(4, Math.floor(round / TRK_EVERY));
+const trkSum = (ids, k) => ids.reduce((a, id) => a + (TRINKETS.find(t => t.id === id)?.[k] || 0), 0);
+// A ghost board picked trinkets at the same rounds you did (seeded by its name, so replays match)
+function ghostTrinkets() {
+  const out = [];
+  for (let k = 1; k <= Math.floor(RUN.round / TRK_EVERY); k++) {
+    const pool = TRINKETS.filter(t => t.tier === Math.min(4, k) && !out.includes(t.id) && (t.banner || !(t.income || t.mastery || t.duo || t.invest))); // ghosts only carry battle trinkets
+    if (pool.length) out.push(pool[Math.abs(hash(GHOST.name + k)) % pool.length].id);
+  }
+  return out;
+}
+const mastMul = m => 1 + MASTERY.per * Math.min(MASTERY.cap, m || 0);
+// Each Flex on the team stands in for one missing duo role (in duo order), so Flex-heavy teams can still build duos.
+const DUO_ROLES = [...new Set(DUOS.flatMap(d => [d.a, d.b]))];
+function flexSubs(team) {
+  const need = DUO_ROLES.filter(r => !team.some(p => p.role === r)), m = new Map();
+  team.filter(p => p.role === 'Flex').forEach((p, i) => need[i] && m.set(p, need[i]));
+  return m;
+}
+// Who gets this duo's bonus, or null when the team can't field both roles
+function duoCast(d, team) {
+  const subs = flexSubs(team), roleOf = p => subs.get(p) || p.role;
+  if (![d.a, d.b].every(r => team.some(p => roleOf(p) === r))) return null;
+  return team.filter(p => d.to.includes(roleOf(p)));
+}
+const duoStacks = side => side === 'mine' ? (RUN.duos || {}) : Object.fromEntries(DUOS.map(d => [d.id, Math.min(d.cap, GHOST.w + GHOST.l)]));
+function duosFor(u, team) {
+  const st = duoStacks(u.side);
+  return DUOS.filter(d => st[d.id] > 0 && duoCast(d, team)?.includes(u)).map(d => ({ d, n: st[d.id], v: d.per * st[d.id] }));
+}
+const ROLE_ZONE = { Entry: 'Entry', Anchor: 'Anchor', Flank: 'Flank', Roam: 'Roam' };
+const FILL_ORDER = [['IGL', 'aim'], ['Support', 'medic'], ['Entry', 'first'], ['Anchor', 'hold'], ['Roam', 'lurker'], ['Flank', 'crossfire']];
+// A unit's role passive, resolved for this battle: { id, v } with rarity, zone and Fill applied
+function rolePassive(u, team) {
+  let id = u.rp, mult = (ROLE_MULT[u.rarity] || 1) * mastMul(u.mastery);
+  if (!ROLE_PASSIVES[id]) return null;
+  if (id === 'fill') {
+    const missing = FILL_ORDER.find(([r]) => !team.some(x => x.role === r));
+    if (!missing) return null;
+    id = missing[1]; mult *= ROLE_PASSIVES.fill.v;
+  }
+  const P = ROLE_PASSIVES[id], zone = ROLE_ZONE[P.role];
+  if (zone && u.zone !== zone) mult *= .5;
+  return { id, v: P.v * mult };
+}
+// Overtime: rounds can't stall. After OT.at every shot hits harder and gas chips everyone, faster and faster.
+const OT = { at: 9000, tick: 500, gas: .025, dmg: .25 }; // gas: share of max HP per tick, ramping each tick (HP and armor builds suffer alike)
+// A headshot adds a flat chunk on top of the bullet: it kills any normal player outright, but a stacked tank can take one.
+const HS_BONUS = 100;
+// When each position first sees someone (ms into the round)
+const CONTACT_AT = { Entry: 250, Flank: 650, Roam: 650, Anchor: 1000, Support: 1500 };
+// Standard utility is one use: each throwable goes off once in the round. Guns are kept (u.weapon) and replace the op's own gun.
+const ITEMS = {
+  Frag:            { throw: 'frag',   at: 480, label: 'FRAG',          boom: 35, chance: .65, info: 'May hit their lane player for 35. Blocked by ADS.' },
+  'Breach Charge': { throw: 'breach', at: 560, label: 'BREACH CHARGE', site: .5, info: '+50% damage vs their Anchor. Blocked by Mute.' },
+  Stun:            { throw: 'flash',  at: 'contact', label: 'FLASH',    blind: 2000, info: 'Their lane player misses more for 2s. Blocked by ADS and Warden.' },
+  Smoke:           { throw: 'smoke',  at: 'contact', label: 'SMOKE',    smoke: 3000, info: 'Enemies miss more into this lane for 3s. Blocked by ADS and Warden.' },
+  'Stim Pack':     { label: 'STIM',     hp: 35,      info: '+35 HP.' },
+  // Consumables: simple stat changes for one battle
+  'Hot Loads':     { label: 'HOT LOADS',    dmgMul: 1.25,               info: '+25% damage.' },
+  'Heavy Rounds':  { label: 'HEAVY ROUNDS', dmgMul: 1.75, rpmMul: .7,   info: '+75% damage, -30% RPM.' },
+  'Hair Trigger':  { label: 'HAIR TRIGGER', dmgMul: .9, rpmMul: 1.45,   info: '+45% RPM, -10% damage.' },
+  'Extra Mags':    { label: 'EXTRA MAGS',   magMul: 2, reloadMul: .5,   info: '2x mag size, 50% faster reloads.' },
+  'Trauma Plate':  { label: 'TRAUMA PLATE', armor: 7,                   info: '+7 armor.' },
+  'Steady Aim':    { label: 'STEADY AIM',   hit: .1,                    info: '+10% hit chance.' },
+  'Prize Money':   { label: 'PRIZE MONEY', info: '+¢4 if they get the most kills on your team.' },
+  Painkillers:     { label: 'PAINKILLERS',  dr: .18,                    info: '-18% damage taken.' },
+  Adrenaline:      { label: 'ADRENALINE', adren: .4, info: '+40% RPM for the first 3s.' },
+  'AP Rounds':     { label: 'AP ROUNDS', pierce: 1,  info: 'Bullets ignore armor.' },
+  Incendiary:      { label: 'INCENDIARY', burn: .03, info: 'Hits burn 3% max HP per second for 2s.' },
+  Claymore:        { throw: 'clay',   at: 'contact', label: 'CLAYMORE', boom: 35, chance: .65, info: 'May hit the first pusher for 35. Blocked by Grim.' },
+};
+
+// Lives: 10 per run. A loss costs 1 on days 1-2, 2 on days 3-4, 3 from day 5.
+const LIVES = 10, lossCost = day => day <= 2 ? 1 : day <= 4 ? 2 : 3;
+// Your team comes from the prep screen (READY saves it); this default mirrors the prep prototype's starting board.
+const DEFAULT_RUN = { round: 6, wins: 4, losses: 2, hp: 7, team: [
+  { name:'Stompn', rarity:'legendary', op:'ash',      zone:'Entry',   pow:163, lvl:2, role:'Entry', rp:'first', passives:['Clutch Gene','Headhunter'] },
+  { name:'Handyy', rarity:'epic',      op:'thermite', zone:'Entry',   pow:127, role:'Flex', rp:'fill', passives:['Clutch Gene','Opener'] },
+  { name:'Gaspro', rarity:'legendary', op:'mute',     zone:'Anchor',  pow:158, role:'IGL', rp:'aim', passives:['Survivor'] },
+  { name:'Yuzus',  rarity:'epic',      op:'dokkaebi', zone:'Flank',   pow:133, role:'Flank', rp:'pressure', passives:['Clutch Gene','Opener'] },
+  { name:'Kyno',   rarity:'common',    op:'thatcher', zone:'Support', pow:111, role:'Support', rp:'medic', passives:['Clutch Gene','Closer'] },
+]};
+let RUN = DEFAULT_RUN; // (the ghost is matched to your record below)
+try { const s = JSON.parse(localStorage.getItem('battler.run')); if (s?.team?.length) RUN = s; } catch {}
+
+// The ghost: another player's saved board from this round (fake for now)
+const GHOST = { name: 'Ghost', w: 5, l: 2, team: [
+  { name:'Jigsaw',   rarity:'epic',      op:'hibana',   zone:'Entry',   pow:140, role:'Entry', rp:'flash', passives:['Opener','Headhunter'] },
+  { name:'Woogiman', rarity:'common',    op:'smoke',    zone:'Anchor',  pow:125, role:'IGL', rp:'tempo', passives:['Clutch Gene'] },
+  { name:'Reeps96',  rarity:'legendary', op:'buck',     zone:'Flank',   pow:165, role:'Flank', rp:'crossfire', passives:['Clutch Gene','Opener'] },
+  { name:'yass',     rarity:'epic',      op:'lesion',   zone:'Roam',    pow:138, role:'Roam', rp:'lurker', passives:['Survivor'] },
+  { name:'Gotti',    rarity:'legendary', op:'thatcher', zone:'Support', pow:129, role:'Support', rp:'quarter', passives:['Survivor','Closer'] },
+]};
+
+
+// Ghosts are matched on wins and losses
+GHOST.w = RUN.wins; GHOST.l = RUN.losses;
+if (RUN.ghost?.length) GHOST.team = RUN.ghost; // prep builds one per day until real ghosts exist
+
+function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const hash = s => [...s].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619), 2166136261);
+/* ---------- Sim: one 5v5 round of gunfights and utility, seeded so the same boards replay the same round ---------- */
+// Guns use their real RPM, pulled toward a shared damage-per-second so no class simply out-DPSes the rest:
+// what's left is the profile. DMRs hit hard and slow, SMGs spray light rounds fast, rifles sit between.
+const TUNE = { ref: 24000, pull: .75 }; // pull: 1 = every gun the same DPS, 0 = real numbers
+// Armor: heavy blocks a flat amount off every bullet (hurts sprays most), light is quicker and can slip the first bullet of a burst
+const ARMOR = { 1: { hp: 100, block: 0, react: -60, dodge: .28 }, 2: { hp: 110, block: 2, react: 0, dodge: 0 }, 3: { hp: 125, block: 5, react: 60, dodge: 0 } };
+const BASE_RPM = 600; // only used to tell when a buff has moved RPM
+const WALL = { dr: .35, hit: .06, breachDmg: .2 }; // Anchors fight from behind a reinforced wall (take less, hit more) until it's breached
+const CROSS = { Entry: 'Anchor', Anchor: 'Entry', Flank: 'Roam', Roam: 'Flank' };
+const PUSHERS = ['Entry', 'Flank', 'Roam'];
+
+// Each operator's gadget. Charges grow with the op's level.
+const GADGETS = {
+  ash:        { name: 'Breaching Rounds',  img: 'Breaching-Rounds',      info: 'Opening shots chip their Anchor. Blocked by ADS.' },
+  thermite:   { name: 'Exothermic Charge', img: 'Exothermic-Charge',     info: 'Breaches their wall. Stopped by Mute or Kaid.' },
+  hibana:     { name: 'X-KAIROS',          img: 'X-Kairos',              info: 'Breaches their wall. Mute can\'t stop it, Kaid can.' },
+  ace:        { name: 'S.E.L.M.A.',        img: null,                    info: 'Breaches their wall. 2 tries at L2+. Stopped by Mute or Kaid.' },
+  blackbeard: { name: 'Rifle Shield',      img: null,                    info: 'Soaks damage and blocks headshots (one per level).' },
+  buck:       { name: 'Skeleton Key',      img: 'Skeleton-Key',          info: 'Opening blast on the lane opponent.' },
+  dokkaebi:   { name: 'Logic Bomb',        img: 'Logic-Bomb',            info: 'Reveals enemies so your team hits more. Blocked by Solis. Not Vigil.' },
+  deimos:     { name: 'DeathMARK',         img: null,                    info: 'Marks their best player for a big hit bonus. Blocked by Solis. Not Vigil.' },
+  nomad:      { name: 'Airjab',            img: 'Airjab-Launcher',       info: 'Knocks back a pusher. Blocked by Grim and ADS.' },
+  thatcher:   { name: 'EMP Grenade',       img: null,                    info: 'Destroys their electronics: Kaid claws, Mute jammers, Jäger ADS.' },
+  twitch:     { name: 'Shock Drone',       img: 'Shock-Drones',          info: 'Destroys a Jäger ADS or Kaid claw, or scouts an enemy. Mute jams it.' },
+  grim:       { name: 'Kawan Hive',        img: null,                    info: 'Disarms their traps and reveals one enemy.' },
+  mute:       { name: 'Signal Disruptor',  img: 'Signal-Disruptor',      info: 'Jams breaches (not Hibana) and drones. EMP destroys it.' },
+  smoke:      { name: 'Gas Grenade',       img: 'Remote-Gas-Grenade',    info: 'Gas hurts their Entry over time. Blocked by Warden and ADS.' },
+  azami:      { name: 'Kiba Barrier',      img: null,                    info: 'Shields herself and your Anchors.' },
+  jager:      { name: 'Active Defense',    img: 'Active-Defense-System', info: 'Blocks frags, flashes, smokes, gas, Airjabs and Breaching Rounds. EMP destroys it.' },
+  warden:     { name: 'Glance Glasses',    img: 'Glance-Smart-Glasses',  info: 'Team ignores gas and smoke. Sees stunned players.' },
+  kaid:       { name: 'Electroclaw',       img: 'Rtila-Electroclaw',     info: 'Stops any breach. EMP destroys it.' },
+  goyo:       { name: 'Volcán Shield',     img: 'Volcan-Shield',         info: 'Burns their Entry when they push. Grim disarms it.' },
+  vigil:      { name: 'ERC-7',             img: 'ERC-7',                 info: 'Can\'t be revealed. Harder to target.' },
+  lesion:     { name: 'Gu Mines',          img: 'Gu-mines',              info: 'Mines chip and slow their pushers. Grim disarms them.' },
+  caveira:    { name: 'Silent Step',       img: 'Silent-Step',           info: 'After her first kill, reveals the whole enemy team.' },
+  solis:      { name: 'SPEC-IO',           img: null,                    info: 'Blocks their reveals (one per level).' },
+  ela:        { name: 'Grzmot Mine',       img: 'Grzmot-Mine',           info: 'Concusses a pusher: they miss more for a while. Grim disarms it.' },
+};
+const ELECTRONIC = ['kaid', 'mute', 'jager'];
+const TRAPS = ['lesion', 'ela', 'goyo', 'nomad'];
+
+// RPM is pulled toward the rate that gives every gun the same damage per second through medium armor;
+// TUNE.pull keeps a little of the real gun's feel. Each bullet's damage varies (range dropoff), so there are no hard breakpoints.
+const through = dmg => Math.max(1, dmg - ARMOR[2].block);
+const normRpm = (dmg, rof) => rof * (TUNE.ref / (rof * through(dmg))) ** TUNE.pull;
+const FALLOFF = .2;
+// Armor soft cap: however much armor someone stacks, at least 35% of every bullet still gets through
+let ARMOR_FLOOR = .28;
+// Share of normal accuracy that lands. Lower = more bursts per kill, longer fights, more shooting on screen.
+let HIT_SCALE = .25;
+// Balance dials (gear text in both files must match these)
+let KEV_HP = 32, PLATE_ARMOR = 10, HOLLOW_DMG = .4;
+let SKIN_BASE = .10, SKIN = .04; // Thick Skin, per copy: damage cut from the first hit, plus this much per hit taken
+let HOLLOW_FLOOR = .21; // armor floor for Hollow Points bullets
+let SKIN_CAP = .6; // Thick Skin max damage cut
+let BLOOD_HEAL = 30, PLATE_BURN = .15, BURN_CAP = .9, SHRED_SKIN = .5; // Bloodthirst heal per kill; fire damage cut per plate (max); share of Thick Skin that works vs Shred bullets // Bloodthirst heal per kill; burn cut per plate
+let SHRED = .08; // Shred Rounds: share of the target's max HP added to each hit (doesn't stack)
+function statsFor(u) {
+  const [armor, opGun] = OPS[u.op] || [2, 'MP5'];
+  const gun = WEAPONS[u.weapon?.name] ? u.weapon.name : opGun;
+  const [cls, dmg, rof0, mag] = WEAPONS[gun] || ['AR', 38, 700, 30], T = TYPES[cls], rof = rof0 || T.pump || 60;
+  const at = new Set(u.att || []), has = k => u.passives?.includes(k), lvl = u.lvl || 1, A = ARMOR[armor];
+  const it = ITEMS[u.buff?.name] || {}, gear = u.gear || [];
+  const g = id => gear.filter(x => x.id === id).length, gn = id => gear.filter(x => x.id === id).reduce((a, x) => a + (x.n || 0), 0);
+  const maxHp = A.hp + (has('Survivor') ? 15 : 0) + KEV_HP * g('kevlar') + GEAR.cond.base * g('cond') + Math.floor(GEAR.cond.scale * gn('cond')) + (it.hp || 0);
+  return {
+    armor, gun, cls, maxHp, hp: maxHp,
+    // Automatics keep their damage and have RPM evened out; pump and bolt guns keep their slow rate and hit harder per shot instead
+    dmg: Math.round(dmg * (rof0 ? 1 : normRpm(dmg, rof) / rof) * (1 + .1 * (lvl - 1)) * (1 + HOLLOW_DMG * g('hollow')) * (it.dmgMul || 1)) + GEAR.vet.base * g('vet') + Math.floor(GEAR.vet.scale * gn('vet')),
+    rpm: Math.round((rof0 ? normRpm(dmg, rof) : rof) * .95 ** Math.max(0, g('kevlar') - 2) * .975 ** g('plate') * (it.rpmMul || 1)),
+    hit: Math.min(.92, .32 + (u.pow - 100) / 250 + (at.has('comp') ? .05 : 0) + (it.hit || 0)),       // chance each bullet lands
+    hs: (.02 + (u.pow - 100) / 3000 + (has('Headhunter') ? .04 : 0)) * through(dmg) / 36 * (T.hs || 1), // per landed bullet, scaled so headshots per second even out across guns
+    mag: Math.round(mag * (at.has('ext') ? 1.5 : 1) * (it.magMul || 1)), reload: Math.round(T.reload * (it.reloadMul || 1)), att: [...at],
+    block: A.block + PLATE_ARMOR * g('plate') + GEAR.iron.base * g('iron') + Math.floor(GEAR.iron.scale * gn('iron')) + (it.armor || 0), dodge: A.dodge, react: A.react - (at.has('grip') ? 80 : 0),
+    dr: it.dr || 0, gear, hollow: g('hollow'), momentum: g('momentum'), blood: g('blood'), fresh: g('fresh'), wind: g('wind'), revenge: g('revenge'), thick: g('thick'), shred: g('shred'), plate: g('plate'), reloads: 0, hits: 0, revUntil: 0,
+    pierce: !!it.pierce, burn: it.burn || 0, adren: it.adren || 0,
+    fx: 0, spent: 0, fxDmg: it.dmgMul > 1 ? it.dmgMul : 0, rpmFx: it.rpmMul > 1 ? it.rpmMul : 0, itArmor: it.armor || 0, steady: it.hit || 0,
+  };
+}
+
+function simulate() {
+  const rng = mulberry32(hash(JSON.stringify(RUN.team) + JSON.stringify(GHOST.team) + RUN.round));
+  const units = [...RUN.team.map((p, i) => ({ ...p, side: 'mine', id: 'm' + i })), ...GHOST.team.map((p, i) => ({ ...p, side: 'theirs', id: 't' + i }))];
+  units.forEach(u => Object.assign(u, statsFor(u), { mastery: u.mastery ?? (u.side === 'theirs' ? Math.min(MASTERY.cap, GHOST.w + GHOST.l) : 0), alive: true, kills: 0, rev: 0, shield: 0, conc: 0, gone: false }));
+  const TRK = { mine: RUN.trinkets || [], theirs: ghostTrinkets() };
+  const TS = Object.fromEntries(['mine', 'theirs'].map(s => [s, Object.fromEntries(['hit', 'mag', 'hp', 'armor', 'rpm', 'dmg', 'rp', 'heal', 'banner'].map(k => [k, trkSum(TRK[s], k)]))]));
+  const ev = [], alive = s => units.filter(u => u.side === s && u.alive), other = s => s === 'mine' ? 'theirs' : 'mine';
+  const has = (u, k) => u.passives?.includes(k), lv = u => u.lvl || 1;
+  const supports = s => alive(s).filter(x => x.zone === 'Support').length;
+  const solo = u => alive(u.side).length === 1;
+  const wpick = (arr, w) => { const tot = arr.reduce((a, x) => a + w(x), 0); let r = rng() * tot; for (const x of arr) { r -= w(x); if (r <= 0) return x; } return arr[arr.length - 1]; };
+  let dead = 0, lastAlive = false, time = 0;
+  const stage = () => alive('mine').length === 1 || alive('theirs').length === 1 ? 'clutch' : dead < 2 ? 'early' : dead < 5 ? 'mid' : 'late';
+
+  // Pre-round: open lanes, item buffs, supports
+  units.forEach(u => { if (CROSS[u.zone] && !units.some(x => x.side === other(u.side) && x.zone === CROSS[u.zone])) u.open = true; });
+  units.filter(u => u.open).forEach(u => ev.push({ t: 'note', id: u.id, text: `${u.zone.toUpperCase()} OPEN`, val: '+10% DMG' }));
+  ['mine', 'theirs'].forEach(s => { const sup = alive(s).filter(u => u.zone === 'Support'); if (sup.length) ev.push({ t: 'note', id: sup[0].id, team: true, text: 'TEAM', val: `+${8 * sup.length}% DMG` }); });
+
+  /* ---- Utility ---- */
+  const wall = { mine: units.some(u => u.side === 'mine' && u.zone === 'Anchor'), theirs: units.some(u => u.side === 'theirs' && u.zone === 'Anchor') };
+  const breached = { mine: false, theirs: false };
+  units.forEach(u => u.ch = ({ mute: lv(u), kaid: lv(u), jager: 1 + lv(u), lesion: 1 + lv(u), ela: lv(u), nomad: lv(u), solis: lv(u), blackbeard: lv(u), ace: lv(u) >= 2 ? 2 : 1, twitch: lv(u), thatcher: 1 + lv(u), grim: lv(u) })[u.op] ?? 1);
+  // Role passives: resolve each unit's, then pool team calls (best of each kind counts)
+  const aura = { mine: {}, theirs: {} };
+  units.forEach(u => { u.rpx = rolePassive(u, units.filter(x => x.side === u.side)); if (u.rpx) u.rpx.v *= 1 + TS[u.side].rp; const r = u.rpx;
+    if (r && ROLE_PASSIVES[r.id].team) aura[u.side][r.id] = Math.max(aura[u.side][r.id] || 0, r.v); });
+  const my = (u, id) => u.rpx?.id === id ? u.rpx.v : 0, call = (u, id) => aura[u.side][id] || 0;
+  units.forEach(u => {
+    u.ch += Math.floor(call(u, 'quarter'));
+    u.mag = Math.round(u.mag * (1 + call(u, 'ammo'))); u.reload = Math.round(u.reload * (1 - call(u, 'reload')));
+    const glue = Math.round(call(u, 'glue')); u.maxHp += glue; u.hp += glue;
+    u.holdArmor = Math.round(my(u, 'hold')); u.block += u.holdArmor;
+    u.streak = 0;
+    const T = TS[u.side], wins = u.side === 'mine' ? RUN.wins : GHOST.w; // trinkets
+    u.hit = Math.min(.92, u.hit + T.hit); u.mag = Math.round(u.mag * (1 + T.mag)); u.maxHp += T.hp; u.hp += T.hp;
+    u.block += T.armor; u.rpm = Math.round(u.rpm * (1 + T.rpm)); u.dmg = Math.round(u.dmg * (1 + T.dmg + T.banner * wins));
+    u.duos = duosFor(u, units.filter(x => x.side === u.side));
+    u.duos.forEach(({ d, v }) => {
+      if (d.id === 'call') u.dmg = Math.round(u.dmg * (1 + v));
+      if (d.id === 'trade') { u.maxHp += Math.round(v); u.hp += Math.round(v); }
+      if (d.id === 'fort') u.block += Math.round(v);
+      if (d.id === 'hunt') u.hit = Math.min(.92, u.hit + v);
+    });
+  });
+  const tk = { mine: 0, theirs: 0 };   // team kills this battle (Tempo)
+  const blockNow = t => t.block + my(t, 'digin') * Math.min(8, Math.max(0, (time - CONTACT_AT[t.zone]) / 1000));
+  const gad = (u, text, x = {}) => ev.push({ t: 'gadget', at: time, id: u.id, op: u.op, text, ...x });
+  const holders = (s, ops) => alive(s).filter(u => ops.includes(u.op) && u.ch > 0 && !u.gone);
+  const spend = u => { u.ch--; if (u.ch <= 0) u.gone = true; return u; };
+  const hurt = (t, d) => { d = Math.min(t.hp - 1, Math.round(d * (1 - t.dr))); t.hp -= d; return { id: t.id, dmg: d, hp: t.hp }; }; // utility never finishes anyone off
+  // A reveal or mark can be blocked by the target team's Solis; Vigil can never be revealed
+  const reveal = (u, foes, amt, text) => {
+    const so = holders(other(u.side), ['solis'])[0];
+    if (so) { spend(so); return gad(u, text, { block: { id: so.id, op: so.op, text: 'DETECTED' }, spent: so.gone ? [so.id] : [] }); }
+    foes = foes.filter(f => f.op !== 'vigil'); if (!foes.length) return;
+    foes.forEach(f => f.rev = Math.max(f.rev, amt));
+    gad(u, text, { marks: foes.map(f => f.id) });
+  };
+  const timers = [], after = (at, fn) => timers.push({ at, fn });
+  const smokeUntil = { mine: {}, theirs: {} }, smokeBy = { mine: {}, theirs: {} }; // a smoked lane: shots into it miss more
+
+  // Setup: shields go up, traps and electronics get placed
+  ev.push({ t: 'setup', ids: units.filter(u => GADGETS[u.op] && !['ash', 'thermite', 'hibana', 'ace', 'buck', 'dokkaebi', 'deimos', 'thatcher', 'twitch', 'grim', 'smoke', 'caveira'].includes(u.op)).map(u => u.id) });
+  units.filter(u => u.op === 'azami').forEach(u => units.filter(a => a.side === u.side && (a.zone === 'Anchor' || a === u)).forEach(a => a.shield += 20 + 10 * lv(u)));
+  units.filter(u => u.op === 'blackbeard').forEach(u => { u.hsShield = u.ch; u.shield += 20 + 10 * lv(u); });
+
+  // Opening: EMPs and drones clear the way, then breaches, rounds and blasts, then gas and reveals
+  units.forEach(u => {
+    const s = u.side, foe = other(s), L = lv(u);
+    if (window.NO_GADGETS && !ITEMS[u.buff?.name]) return; // balance testing: guns only
+    if (u.op === 'thatcher') after(250, () => {
+      if (!u.alive) return;
+      const hit = holders(foe, ELECTRONIC).sort((a, b) => ELECTRONIC.indexOf(a.op) - ELECTRONIC.indexOf(b.op)).slice(0, u.ch);
+      if (!hit.length) return;
+      hit.forEach(h => { h.ch = 0; h.gone = true; }); u.gone = true;
+      gad(u, 'EMP', { marks: hit.map(h => h.id), spent: [u.id, ...hit.map(h => h.id)] });
+    });
+    if (u.op === 'twitch') after(320, () => {
+      if (!u.alive) return;
+      const mu = holders(foe, ['mute'])[0];
+      if (mu) { u.gone = true; return gad(u, 'DRONE', { block: { id: mu.id, op: 'mute', text: 'JAMMED' }, spent: [u.id] }); }
+      const hit = holders(foe, ['jager', 'kaid']).slice(0, u.ch);
+      u.gone = true;
+      if (!hit.length) { const t = wpick(alive(foe), () => 1); return t && reveal(u, [t], .08, 'DRONE SCOUT'); } // nothing to shock: it scouts instead
+      hit.forEach(h => { h.ch = 0; h.gone = true; });
+      gad(u, 'DRONE', { marks: hit.map(h => h.id), spent: [u.id, ...hit.map(h => h.id)] });
+    });
+    if (u.op === 'grim') after(380, () => {
+      if (!u.alive) return;
+      const traps = holders(foe, TRAPS).slice(0, u.ch);
+      traps.forEach(h => { h.ch = 0; h.gone = true; });
+      if (traps.length) gad(u, 'TRAPS CLEARED', { marks: traps.map(h => h.id), spent: traps.map(h => h.id) });
+      const t = wpick(alive(foe), x => x.pow); if (t) reveal(u, [t], .05, 'REVEAL');
+      u.gone = true;
+    });
+    if (u.op === 'ash') after(450, () => {
+      if (!u.alive) return;
+      const t = alive(foe).find(x => x.zone === 'Anchor') || alive(foe).find(x => x.zone === CROSS[u.zone]) || alive(foe)[0]; if (!t) return;
+      const j = holders(foe, ['jager'])[0];
+      u.gone = true;
+      if (j) { spend(j); return gad(u, 'ROUNDS', { block: { id: j.id, op: 'jager', text: 'EATEN' }, spent: [u.id, ...(j.gone ? [j.id] : [])] }); }
+      gad(u, 'ROUNDS', { hits: [hurt(t, 25 + 8 * (L - 1))], spent: [u.id] });
+    });
+    if (u.op === 'buck') after(520, () => {
+      if (!u.alive) return;
+      const t = alive(foe).find(x => x.zone === CROSS[u.zone]) || wpick(alive(foe), () => 1); if (!t) return;
+      u.gone = true; gad(u, 'SKELETON KEY', { hits: [hurt(t, 20 + 8 * (L - 1))], spent: [u.id] });
+    });
+    if (['thermite', 'hibana', 'ace'].includes(u.op)) {
+      const tryBreach = at => after(at, () => {
+        if (!u.alive || !wall[foe] || breached[foe]) return;
+        const blocker = u.op === 'hibana' ? holders(foe, ['kaid'])[0] : holders(foe, ['mute'])[0] || holders(foe, ['kaid'])[0]; // Mute takes what it can, saving claws for Hibana
+        spend(u);
+        if (blocker) { spend(blocker); gad(u, 'BREACH', { block: { id: blocker.id, op: blocker.op, text: blocker.op === 'kaid' ? 'CLAWED' : 'JAMMED' }, spent: [...(u.gone ? [u.id] : []), ...(blocker.gone ? [blocker.id] : [])] }); if (u.ch > 0) tryBreach(at + 500); return; }
+        breached[foe] = true; u.gone = true;
+        gad(u, 'WALL BREACHED', { breach: foe, spent: [u.id] });
+      });
+      tryBreach(600 + (u.op === 'ace' ? 50 : u.op === 'hibana' ? 100 : 0));
+    }
+    if (u.op === 'smoke') [700, 1300, 1900].forEach((at, k) => after(at, () => {
+      if (!u.alive || (k && u.ch === 0)) return;
+      const ts = alive(foe).filter(x => x.zone === 'Entry'); if (!ts.length) return;
+      const w = holders(foe, ['warden'])[0], j = k === 0 && holders(foe, ['jager'])[0];
+      if (k === 2) u.gone = true;
+      if (j) { spend(j); u.gone = true; u.ch = 0; return gad(u, 'GAS', { block: { id: j.id, op: 'jager', text: 'EATEN' }, spent: [u.id, ...(j.gone ? [j.id] : [])] }); }
+      if (w) { if (k === 0) gad(u, 'GAS', { block: { id: w.id, op: 'warden', text: 'IGNORED' }, spent: [u.id] }); return; }
+      gad(u, k ? '' : 'GAS', { hits: ts.map(t => hurt(t, 7 + 4 * L)), quiet: k > 0, spent: k === 2 ? [u.id] : [] });
+    }));
+    if (u.op === 'dokkaebi') after(800, () => { if (!u.alive) return; u.gone = true; reveal(u, alive(foe).sort(() => rng() - .5).slice(0, 1 + L), .08, 'LOGIC BOMB'); });
+    if (u.op === 'deimos') after(900, () => { if (!u.alive) return; u.gone = true; const t = alive(foe).filter(x => x.op !== 'vigil').sort((a, b) => b.pow - a.pow)[0]; if (t) reveal(u, [t], .18 + .04 * L, 'DEATHMARK'); });
+    // Traps go off as their pushers make contact
+    if (['lesion', 'ela', 'goyo', 'nomad'].includes(u.op)) {
+      const lanes = u.op === 'goyo' ? ['Entry'] : u.op === 'nomad' ? ['Flank', 'Roam'] : PUSHERS;
+      const n = u.op === 'goyo' ? 1 : u.ch;
+      for (let k = 0; k < n; k++) after(CONTACT_AT[lanes[0]] + 150 + k * 350, () => {
+        if (!u.alive || u.gone) return;
+        const t = wpick(alive(foe).filter(x => lanes.includes(x.zone)), () => 1); if (!t || !lanes.includes(t.zone)) return;
+        spend(u); if (u.op === 'goyo') u.gone = true;
+        const sp = u.gone ? [u.id] : [];
+        if (u.op === 'lesion') { t.next += 200; gad(u, 'GU MINE', { hits: [hurt(t, 9 + 4 * L)], spent: sp }); }
+        if (u.op === 'ela')    { t.conc = time + 2500; gad(u, 'CONCUSSED', { marks: [t.id], conc: true, hits: [hurt(t, 10)], spent: sp }); }
+        if (u.op === 'goyo')   { gad(u, 'VOLCÁN', { hits: alive(foe).filter(x => x.zone === 'Entry').map(x => hurt(x, 20 + 10 * L)), spent: sp }); }
+        if (u.op === 'nomad')  { const j = holders(foe, ['jager'])[0]; if (j) { spend(j); return gad(u, 'AIRJAB', { block: { id: j.id, op: 'jager', text: 'EATEN' }, spent: [...sp, ...(j.gone ? [j.id] : [])] }); }
+          t.next += 400; t.conc = time + 1000; gad(u, 'AIRJAB', { marks: [t.id], conc: true, spent: sp }); }
+      });
+    }
+    // Throwables: each goes off once. ADS eats frags, flashes and smokes; Mute jams breach charges; Warden ignores flash and smoke
+    const it = ITEMS[u.buff?.name];
+    if (it?.throw) after(it.at === 'contact' ? CONTACT_AT[u.zone] + 120 : it.at, () => {
+      if (!u.alive) return;
+      const foes = alive(foe), pushers = foes.filter(x => PUSHERS.includes(x.zone));
+      const t = it.throw === 'breach' ? (foes.find(x => x.zone === 'Anchor') || foes.find(x => x.zone === CROSS[u.zone]))
+        : it.throw === 'clay' ? (pushers.find(x => x.zone === CROSS[u.zone]) || pushers[0])
+        : (foes.find(x => x.zone === CROSS[u.zone]) || foes[Math.floor(rng() * foes.length)]);
+      if (!t) return;
+      const base = { t: 'util', at: time, from: u.id, to: t.id, dmg: 0, hp: t.hp, label: it.label, fx: it.throw };
+      const block = (b, text) => { spend(b); ev.push({ ...base, block: { id: b.id, op: b.op, text }, spent: b.gone ? [b.id] : [] }); };
+      const ads = ['frag', 'flash', 'smoke'].includes(it.throw) && holders(foe, ['jager'])[0];
+      if (ads) return block(ads, 'EATEN');
+      const mu = it.throw === 'breach' && holders(foe, ['mute'])[0];
+      if (mu) return block(mu, 'JAMMED');
+      const gr = it.throw === 'clay' && alive(foe).find(x => x.op === 'grim');
+      if (gr) return ev.push({ ...base, block: { id: gr.id, op: 'grim', text: 'SPOTTED' } });
+      const wd = ['flash', 'smoke'].includes(it.throw) && alive(foe).find(x => x.op === 'warden');
+      if (wd) return ev.push({ ...base, block: { id: wd.id, op: 'warden', text: 'IGNORED' } });
+      if (it.boom) { if (rng() >= it.chance) return ev.push({ ...base, missed: true }); const h = hurt(t, it.boom); return ev.push({ ...base, dmg: h.dmg, hp: t.hp }); }
+      if (it.site) { u.siteBonus = it.site; return ev.push(base); }
+      if (it.blind) { t.blind = time + it.blind; t.blindBy = u; return ev.push(base); }
+      if (it.smoke) { smokeUntil[s][u.zone] = time + it.smoke; smokeBy[s][u.zone] = u; return ev.push({ ...base, to: u.id }); }
+    });
+  });
+
+  // Live numbers for this moment of the round
+  const rpmNow = (u, st) => u.rpm * (1 + call(u, 'tempo') * tk[u.side]) * (time < CONTACT_AT[u.zone] + 2000 ? 1 + my(u, 'first') : 1) * (u.adren && time < CONTACT_AT[u.zone] + 3000 ? 1 + u.adren : 1) * (st === 'early' && has(u, 'Opener') ? 1.25 : 1) * ((st === 'late' || st === 'clutch') && has(u, 'Closer') ? 1.25 : 1) * (u.winded ? 1 + .4 * u.wind : 1);
+  const dmgNow = (u, st, tg) => u.dmg * (1 + my(u, 'lurker') * Math.min(5, Math.max(0, (time - CONTACT_AT[u.zone]) / 1000)) + my(u, 'hunter') * tk[u.side]
+      + my(u, 'pressure') * Math.min(8, u.streak) + (alive(u.side).length >= 3 ? my(u, 'lastline') : 0) + (alive(u.side).some(x => x.zone === 'Roam') ? my(u, 'pincer') : 0) + my(u, 'adapt')) * (1 + .15 * u.momentum * u.kills) * (time > OT.at ? 1 + OT.dmg * (time - OT.at) / 1000 : 1) * (TYPES[u.cls].dmg?.[RANGE[u.zone]] ?? 1) * (tg?.zone === 'Anchor' && u.siteBonus ? 1 + u.siteBonus : 1) * (u.open ? 1.1 : 1) * (1 + .08 * supports(u.side)) * (solo(u) && has(u, 'Clutch Gene') ? 1.25 : 1)
+    * (breached[other(u.side)] && u.zone === 'Entry' && st === 'early' ? 1 + WALL.breachDmg : 1)
+    * (u.fresh && u.ammo > u.mag / 2 ? 1 + .2 * u.fresh : 1) * (u.revenge && time < u.revUntil ? 1 + .35 * u.revenge : 1);
+  const takeMul = (t, shred) => (1 - t.dr) * (1 - Math.min(SKIN_CAP, t.thick * (shred ? SHRED_SKIN : 1) * (SKIN_BASE + SKIN * t.hits))) * (t.zone === 'Anchor' && wall[t.side] && !breached[t.side] ? 1 - WALL.dr : 1); // share of damage that gets through
+
+  // Everyone runs on one clock. Each player fires bursts on their own rhythm: a burst is a fixed trigger-pull,
+  // so a fast gun puts more (lighter) rounds into it. They shoot whoever they can see, mostly the nearest enemy.
+  const WINDOW = 350, RESET = 450;
+  const react = u => Math.max(100, 420 - (u.pow - 100) * 2.5 + u.react);
+  const pos = u => SPOTS[u.side][u.zone], dist = (a, b) => Math.hypot(pos(a)[0] - pos(b)[0], pos(a)[1] - pos(b)[1]);
+  units.forEach(u => { u.ammo = u.mag; u.next = CONTACT_AT[u.zone] + react(u) + rng() * 250; u.tg = null; u.by = null; u.killAt = -1e9; });
+  // A death, from a gun, fire or overtime gas (killer may be null)
+  const die = (killer, victim, at, hs, how) => {
+    if (!victim.alive) return;
+    const st = stage();
+    const tag = how || (hs ? 'HEADSHOT' : at - victim.killAt < 2200 ? 'TRADE'
+      : st === 'clutch' && solo(killer) && has(killer, 'Clutch Gene') ? 'CLUTCH GENE'
+      : st === 'early' && has(killer, 'Opener') ? 'OPENER'
+      : (st === 'late' || st === 'clutch') && has(killer, 'Closer') ? 'CLOSER'
+      : dead === 0 ? 'OPENING PICK' : '');
+    victim.alive = false; victim.hp = 0; dead++; tk[other(victim.side)]++;
+    alive(victim.side).forEach(x => { if (x.revenge) x.revUntil = at + 3000; }); // Revenge
+    if (killer && my(victim, 'space')) killer.rev = Math.max(killer.rev, my(victim, 'space'));   // Space Maker: their killer is exposed
+    if (killer) { killer.kills++; killer.killAt = at; }
+    ev.push({ t: 'kill', at, killer: killer?.id ?? null, victim: victim.id, tag });
+    if (!killer) return;
+    // Caveira's first kill becomes an interrogation: the whole enemy team is revealed
+    if (killer.op === 'caveira' && !killer.gone && killer.alive) { killer.gone = true; time = Math.max(time, at + 200); reveal(killer, alive(victim.side), .08, 'INTERROGATED'); }
+    // Anyone who was on the victim has to find a new angle
+    alive(killer.side).forEach(u => { if (u.tg === victim) { u.tg = null; u.next = Math.max(u.next, at + react(u) + 250 + rng() * 350); } });
+    // Their teammates swing toward the killer to trade
+    alive(victim.side).forEach(u => { if (dist(u, killer) < 40 && rng() < .5) u.by = killer; });
+    // Bloodthirst: the killer heals
+    if (TS[killer.side].heal) alive(killer.side).forEach(x => { const amt = Math.min(TS[killer.side].heal, x.maxHp - x.hp); if (amt > 0) { x.hp += amt; ev.push({ t: 'heal', at: at + 250, from: x.id, to: x.id, amt, hp: x.hp }); } });
+    if (killer.blood && killer.alive) { const amt = Math.min(BLOOD_HEAL * killer.blood, killer.maxHp - killer.hp); if (amt > 0) { killer.hp += amt; ev.push({ t: 'heal', at: at + 200, from: killer.id, to: killer.id, amt, hp: killer.hp }); } }
+    // Supports patch up their most hurt teammate after each kill
+    ['mine', 'theirs'].forEach(s => {
+      const sup = alive(s).find(x => x.zone === 'Support'); if (!sup) return;
+      const h = alive(s).filter(x => x.hp < x.maxHp).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0]; if (!h) return;
+      const amt = Math.min(Math.round(20 * (1 + call(sup, 'medic'))), h.maxHp - h.hp); h.hp += amt;
+      ev.push({ t: 'heal', at: at + 400, from: sup.id, to: h.id, amt, hp: h.hp });
+    });
+  };
+  // Fire: ticks every half second while it lasts
+  const ignite = (by, t) => {
+    const fresh = !(t.burnUntil > time); t.burnUntil = time + 2000; t.burnBy = by;
+    if (!fresh) return;
+    const tick = at => after(at, () => {
+      if (!t.alive || !(t.burnUntil >= at)) return;
+      const d = Math.max(1, Math.round(t.maxHp * by.burn / 2 * (1 - Math.min(BURN_CAP, PLATE_BURN * t.plate)))); t.hp -= d; by.fx += d;
+      ev.push({ t: 'dot', at, id: t.id, dmg: d, hp: Math.max(0, t.hp), kind: 'burn' });
+      if (t.hp <= 0) return die(by.alive ? by : null, t, at, false, 'BURNED');
+      tick(at + 500);
+    });
+    tick(time + 500);
+  };
+  // Overtime: from OT.at, gas chips everyone and ramps each tick. The lowest HP goes first; stop once a team is gone.
+  after(OT.at, () => { ev.push({ t: 'ot', at: OT.at }); });
+  for (let k = 1; k < 60; k++) after(OT.at + k * OT.tick, () => {
+    const at = OT.at + k * OT.tick;
+    for (const u of units.filter(x => x.alive).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)) {
+      if (!alive('mine').length || !alive('theirs').length) break;
+      const d = Math.max(1, Math.round(u.maxHp * OT.gas * k)); u.hp -= d; ev.push({ t: 'dot', at, id: u.id, dmg: d, hp: Math.max(0, u.hp), kind: 'gas' });
+      if (u.hp <= 0) die(null, u, at, false, 'OVERTIME');
+    }
+  });
+  const pickTarget = sh => wpick(alive(other(sh.side)), x =>
+    (x === sh.by ? 3 : 1) * (x.tg === sh ? 1.5 : 1) * (CROSS[sh.zone] === x.zone ? 2 : 1) * (x.op === 'vigil' ? .6 : 1) * (x.rev ? 1.5 : 1) / (dist(sh, x) + 10) ** 2);
+
+  ev.push({ t: 'start', at: 0 });
+  for (let guard = 0; guard < 4000 && alive('mine').length && alive('theirs').length; guard++) {
+    const sh = units.filter(u => u.alive).sort((a, b) => a.next - b.next)[0];
+    timers.sort((a, b) => a.at - b.at);
+    if (timers.length && timers[0].at <= sh.next) { const tm = timers.shift(); time = tm.at; tm.fn(); continue; }
+    time = sh.next;
+    const st = stage();
+    if (st === 'clutch' && !lastAlive) {
+      lastAlive = true;
+      const c = alive('mine').length === 1 ? alive('mine')[0] : alive('theirs')[0];
+      ev.push({ t: 'clutch', at: time, id: c.id, n: alive(other(c.side)).length });
+    }
+    // Stick with your target; sometimes swing onto whoever is hitting you
+    let tg = sh.tg?.alive ? sh.tg : null;
+    if (tg && !sh.jump && sh.by?.alive && sh.by !== tg && rng() < .25) tg = null;
+    if (!tg) {
+      tg = pickTarget(sh);
+      sh.tg = tg; sh.jump = tg.tg !== sh;               // they're looking elsewhere: you get the jump on them
+      ev.push({ t: 'aim', at: time, from: sh.id, to: tg.id });
+      sh.next = time + 120; continue;                   // a beat to line up the shot
+    }
+    // The burst: each bullet rolls to hit, each hit might be a headshot; armor blocks a flat amount per bullet
+    const rpm = rpmNow(sh, st), n = rpm * WINDOW / 60000, shots = Math.min(sh.ammo, Math.max(1, Math.floor(n) + (rng() < n % 1 ? 1 : 0)));
+    if (sh.rpmFx) sh.fx += shots * (1 - 1 / sh.rpmFx);
+    if (sh.adren && time < CONTACT_AT[sh.zone] + 3000) sh.fx += shots * sh.adren / (1 + sh.adren);
+    if (my(sh, 'flash') && !sh.flashed) { sh.flashed = true; tg.fhUntil = time + 2000; tg.fhV = my(sh, 'flash'); }   // Flash Hands: first target
+    sh.streak++;                                                                                                         // Pressure: bursts fired
+    let hitP = Math.max(.05, Math.min(.92, sh.hit + call(sh, 'aim') + my(sh, 'adapt') + (tg.tg && tg.tg !== sh ? my(sh, 'crossfire') : 0) - (sh.fhUntil > time ? sh.fhV : 0) + TYPES[sh.cls].hit[RANGE[sh.zone]] + (sh.att.includes('acog') ? (RANGE[sh.zone] === 'close' ? -.04 : .06) : 0) + (sh.jump ? .1 : 0) + tg.rev - (sh.conc > time ? .2 : 0) - (sh.blind > time ? .3 : 0) - ((smokeUntil[tg.side][tg.zone] || 0) > time ? .25 : 0) + (sh.zone === 'Anchor' && wall[sh.side] && !breached[sh.side] ? WALL.hit : 0)));
+    hitP *= HIT_SCALE;   // one global dial: every bonus and penalty above shrinks with it
+    const hsP = sh.hs + (solo(sh) && has(sh, 'Clutch Gene') ? .04 : 0);
+    sh.jump = false;
+    const b = []; let dmg = 0, hs = false, saved = false;
+    for (let k = 0; k < shots && dmg < tg.hp; k++) {
+      if (k === 0 && tg.dodge && rng() < tg.dodge) { b.push(0); continue; }
+      if (my(tg, 'ghost') && rng() < my(tg, 'ghost')) { b.push(0); continue; }    // Ghost: slips bullets      // light ops slip the first round
+      const roll = rng();
+      if (roll >= hitP) {
+        if (sh.blind > time && roll < hitP + .3 * HIT_SCALE) sh.blindBy.fx++;
+        else if ((smokeUntil[tg.side][tg.zone] || 0) > time && roll < hitP + .25 * HIT_SCALE) smokeBy[tg.side][tg.zone].fx++;
+        b.push(0); continue;
+      }
+      if (sh.steady && roll >= hitP - sh.steady * HIT_SCALE) sh.fx++;
+      let bonus = 0;
+      if (rng() < hsP) {
+        if (tg.hsShield > 0) { tg.hsShield--; saved = true; }
+        else if (tg.hp - dmg <= HS_BONUS + dmgNow(sh, st, tg)) { hs = true; b.push(tg.hp - dmg); dmg = tg.hp; break; }
+        else bonus = HS_BONUS;                                                       // a tank survives it, barely
+      }
+      const raw = dmgNow(sh, st, tg) * (1 - FALLOFF + rng() * 2 * FALLOFF) * takeMul(tg, sh.shred), blk = sh.pierce ? 0 : blockNow(tg) * (sh.hollow ? 2 : 1);
+      const floor = sh.hollow && !sh.pierce ? HOLLOW_FLOOR : ARMOR_FLOOR;
+      let d = Math.max(1, Math.round(Math.max(raw * floor, raw - blk))) + bonus;
+      const arm = (r, k) => Math.max(1, Math.round(Math.max(r * floor, r - k))) + bonus;
+      if (sh.fxDmg) sh.fx += d - arm(raw / sh.fxDmg, blk);
+      if (sh.siteBonus && tg.zone === 'Anchor') sh.fx += d - arm(raw / (1 + sh.siteBonus), blk);
+      if (sh.pierce) sh.fx += d - arm(raw, blockNow(tg) * (sh.hollow ? 2 : 1));
+      if (tg.itArmor && !sh.pierce) tg.fx += arm(raw, Math.max(0, blk - tg.itArmor * (sh.hollow ? 2 : 1))) - d;
+      if (tg.dr) tg.fx += arm(raw / (1 - tg.dr), blk) - d;
+      if (sh.shred) d += Math.round(tg.maxHp * SHRED);   // Shred Rounds (one per player): the bigger they are, the more it hurts
+      if (tg.shield > 0) { const a = Math.min(tg.shield, d); tg.shield -= a; d -= a; }
+      d = Math.min(tg.hp - dmg, d); b.push(Math.max(d, .001)); dmg += d; if (d > 0) tg.hits++;
+    }
+    dmg = Math.round(dmg);
+    tg.hp -= dmg; if (dmg) { tg.by = sh; if (tg.holdArmor) { tg.block -= tg.holdArmor; tg.holdArmor = 0; } if (sh.burn && tg.hp > 0) ignite(sh, tg); }
+    ev.push({ t: 'shot', at: time, from: sh.id, to: tg.id, b: b.map(x => x ? Math.round(x) || 1 : 0), cad: Math.round(60000 / rpm), dmg, hs, saved, hp: tg.hp });
+    if (tg.wind && !tg.winded && tg.hp > 0 && tg.hp < .5 * tg.maxHp) { // Second Wind
+      tg.winded = true; const amt = Math.min(35 * tg.wind, tg.maxHp - tg.hp); tg.hp += amt; ev.push({ t: 'heal', at: time + 120, from: tg.id, to: tg.id, amt, hp: tg.hp });
+    }
+    sh.next = time + (shots * 60000 / rpm + RESET) * (.85 + rng() * .3);
+    const used = ['SG', 'DMR'].includes(sh.cls) ? shots : Math.ceil(shots * SPRAY);
+    sh.ammo -= used; sh.spent += used;
+    ev.at(-1).ammo = Math.max(0, sh.ammo);
+    if (sh.ammo <= 0) { sh.ammo = sh.mag; sh.reloads++; ev.push({ t: 'reload', at: time + b.length * 60000 / rpm, id: sh.id, dur: sh.reload }); sh.next += sh.reload; }
+    if (tg.hp > 0) continue;
+
+    die(sh, tg, time + b.length * 60000 / rpm, hs);
+  }
+  ev.sort((a, b) => (a.at ?? -1) - (b.at ?? -1));
+  ev.push({ t: 'result', at: Math.max(time, ...ev.map(e => e.at || 0)) + 600, win: alive('mine').length > 0, left: alive('mine').length || alive('theirs').length });
+  return { units, ev, wall, breached, trk: TRK };
+}
+
+/* ---------- Sound: tiny synthesized cues, no files ---------- */
+const sfx = (() => {
+  let ctx = null, on = true;
+  const ac = () => {
+    if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; } }
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  };
+  const ok = () => on && !skipping && ac() && ctx.state === 'running';
+  const env = (g, t, d, peak) => { g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + .004); g.gain.exponentialRampToValueAtTime(.0001, t + d); };
+  function noise(dur, freq, q, peak, delay = 0) {
+    if (!ok()) return;
+    const t = ctx.currentTime + delay, buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * dur), ctx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    s.buffer = buf; f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q; env(g, t, dur, peak);
+    s.connect(f).connect(g).connect(ctx.destination); s.start(t); s.stop(t + dur + .02);
+  }
+  function tone(type, f1, f2, dur, peak, delay = 0) {
+    if (!ok()) return;
+    const t = ctx.currentTime + delay, o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur); env(g, t, dur, peak);
+    o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + dur + .02);
+  }
+  return {
+    aim: () => tone('sine', 1500, 1900, .06, .05),
+    shot: mine => { noise(.09, mine ? 2600 : 1700, .7, .45); tone('square', mine ? 180 : 140, 60, .06, .12); },
+    kill: (mine, big) => {
+      tone('sine', big ? 150 : 120, 38, big ? .45 : .25, .7);
+      if (mine) { tone('square', 1046, 1046, .06, .09, .04); tone('square', 1568, 1568, .1, .08, .1); }
+      else tone('sawtooth', 240, 90, .22, .09, .04);
+    },
+    buff: () => { tone('triangle', 660, 990, .12, .12); },
+    hit: hs => { noise(.05, hs ? 4200 : 900, 1.2, hs ? .35 : .22); if (hs) tone('square', 2093, 2093, .07, .07, .02); },
+    heal: () => { tone('sine', 520, 780, .18, .1); tone('sine', 780, 1040, .16, .07, .08); },
+    plant: () => { tone('square', 300, 200, .05, .06); noise(.04, 3000, 1, .08); },
+    band: () => noise(.45, 700, .6, .2),
+    beat: () => { tone('sine', 72, 42, .14, .55); tone('sine', 72, 42, .12, .4, .18); },
+    win: () => [523, 659, 784, 1047].forEach((f, i) => tone('square', f, f, .16, .1, i * .1)),
+    loss: () => [392, 311, 233].forEach((f, i) => tone('triangle', f, f * .97, .3, .2, i * .17)),
+    unlock: ac,
+    toggle: () => (on = !on),
+  };
+})();
+addEventListener('pointerdown', () => sfx.unlock(), { once: true });
+
+/* ---------- Playback ---------- */
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const opIcon = op => `<span class="op">${SVG[op] ?? ''}</span>`;
+// Where each position stands on the schematic (% of the map). Matchups share a spot:
+// your Entry at their site door facing their Anchor, your Flank meeting their Roam on the top route, and so on.
+const SPOTS = {
+  mine:   { Anchor: [16, 50], Entry: [65, 50], Flank: [38, 17], Roam: [38, 83], Support: [9, 83] },
+  theirs: { Anchor: [84, 50], Entry: [35, 50], Roam: [62, 17], Flank: [62, 83], Support: [91, 83] },
+};
+const ZONE_IDS = ['Entry', 'Anchor', 'Flank', 'Roam', 'Support'];
+let LAST = null, SIM, speed = 1, skipping = false, runId = 0, heart = null;
+// Defaults from the menu's settings (battler.settings); the buttons still change them for this fight
+try { const st = JSON.parse(localStorage.getItem('battler.settings') || '{}');
+  if (st.speed === 2) { speed = 2; $('speedBtn').textContent = '▶▶ 2×'; $('speedBtn').classList.add('on'); }
+  if (st.sound === false) $('sndBtn').classList.toggle('on', sfx.toggle()); } catch {}
+// Progress through this fight, so leaving and coming back picks up at the same moment
+const progKey = () => `${RUN.round}:${RUN.wins}:${RUN.hp}`;
+let CUR = 0, RESUME = 0;
+try { const p = JSON.parse(localStorage.getItem('battler.prog')); if (p?.key === progKey()) RESUME = p.i; } catch {}
+const saveProg = () => { if (NOT_OWNER) return; try { localStorage.setItem('battler.prog', JSON.stringify({ key: progKey(), i: CUR })); } catch {} };
+addEventListener('pagehide', saveProg);
+addEventListener('visibilitychange', () => document.hidden && saveProg());
+const U = id => SIM.units.find(u => u.id === id);
+const tile = id => document.querySelector(`.tile[data-u="${id}"]`);
+// Playback waits only count down while the fight isn't paused (tapping a player pauses it)
+let paused = false;
+const tick = ms => new Promise(r => setTimeout(r, ms));
+const sleep = async ms => {
+  if (skipping) return;
+  let left = ms / speed;
+  // count real elapsed time (timers often fire late), and none of it while paused
+  while (left > 0) { const t = performance.now(); await tick(Math.min(left, 40)); if (skipping) return; if (!paused) left -= performance.now() - t; }
+};
+function setPaused(on) {
+  if (paused === on) return;
+  paused = on;
+  document.getAnimations().forEach(a => on ? a.pause() : a.play());   // bullets, bars, banners all freeze
+  if (on) { clearInterval(heart); heart = heart ? 'paused' : null; }
+  else if (heart === 'paused') heart = setInterval(sfx.beat, 950 / speed);
+  document.body.classList.toggle('paused', on);
+  const b = $('pauseBtn'); if (b) { b.textContent = on ? '▶' : '❚❚'; b.classList.toggle('on', on); }
+}
+let pausedBy = null;
+addEventListener('keydown', e => { if (e.code === 'Space' && $('result').hidden) { e.preventDefault(); $('pop').hidden = true; setPaused(!paused); pausedBy = paused ? 'button' : null; } });
+const inZone = (side, z) => SIM.units.filter(u => u.side === side && u.zone === z);
+
+const ICO = {
+  dmg: '<svg viewBox="0 0 12 12"><path d="M3 10.5V5.5Q3 1.5 6 1q3 .5 3 4.5v5z"/></svg>',                       // a bullet
+  hit: '<svg viewBox="0 0 12 12"><circle cx="6" cy="6" r="4"/><path d="M6 0v3.5M6 8.5V12M0 6h3.5M8.5 6H12"/></svg>', // crosshair
+  rpm: '<svg viewBox="0 0 12 12"><path d="M10.5 6A4.5 4.5 0 1 1 6 1.5M6 1.5h3.5M9.5 1.5v3"/></svg>',                 // cycle
+  mag: '<svg viewBox="0 0 12 12"><path d="M3.5 1h5v4l1 6h-5l-1-6z"/></svg>',                                     // magazine
+  hp:  '<svg viewBox="0 0 12 12"><path d="M6 10.5 1.6 6.2A2.6 2.6 0 0 1 6 2.6a2.6 2.6 0 0 1 4.4 3.6z"/></svg>',     // heart
+  arm: '<svg viewBox="0 0 12 12"><path d="M6 1 10.5 2.6V6c0 2.6-2 4.3-4.5 5C3.5 10.3 1.5 8.6 1.5 6V2.6z"/></svg>', // shield
+};
+// Gadget icon: the real gadget sprite where we have one, a simple drawn badge otherwise
+const GADGET_SVG = '<svg viewBox="0 0 24 24"><path d="M12 2l8.5 5v10L12 22l-8.5-5V7z"/><circle cx="12" cy="12" r="3.2"/></svg>';
+const gadgetIcon = op => { const g = GADGETS[op]; if (!g) return ''; return g.img ? `<img src="gadgets/${g.img}.png" alt="">` : GADGET_SVG; };
+function statsHTML(u) {
+  return `<span class="st fit"><span title="Damage per bullet">${ICO.dmg}<b>${u.dmg}</b></span><span title="Rounds per minute">${ICO.rpm}<b>${u.rpm}</b></span></span>`; // the rest is one tap away
+}
+function tileHTML(u) {
+  return `<button class="tile ${u.side}" style="--rc:var(--r-${u.rarity})" data-u="${u.id}">
+    <span class="em">${opIcon(u.op)}<span class="ticks"></span>${gunIcon(u.gun)}<span class="magb"><i></i></span></span><span class="hpb"><i></i><b>${u.maxHp}</b></span><span class="nmw"><span class="nm">${esc(u.name)}</span></span><span class="stw">${statsHTML(u)}</span></button>`;
+}
+function renderBoard() {
+  const lines = `<svg class="lines" viewBox="0 0 100 100" preserveAspectRatio="none">
+    <rect class="site a ${SIM.wall.mine ? 'walled' : ''}" x="4" y="31" width="24" height="38" rx=".5"/><rect class="site b ${SIM.wall.theirs ? 'walled' : ''}" x="72" y="31" width="24" height="38" rx=".5"/>
+    <path class="route" d="M16 31 V17 H84 V31 M16 69 V83 H84 V69 M28 50 H72"/></svg>
+    <span class="slbl a" style="left:16%;top:calc(31% - 1.3rem)">YOUR SITE</span><span class="slbl b" style="left:84%;top:calc(31% - 1.3rem)">THEIR SITE</span>`;
+  const grps = ['mine', 'theirs'].flatMap(side => ZONE_IDS.map(z => {
+    const [x, y] = SPOTS[side][z], us = inZone(side, z);
+    return `<div class="grp ${side === 'mine' ? 'a' : 'b'}" data-side="${side}" data-zone="${z}" style="left:${x}%;top:${y}%">
+      ${us.length ? `<div class="row">${us.map(tileHTML).join('')}</div>` : `<div class="ghost">—</div>`}<span class="zl">${z.toUpperCase()}</span></div>`;
+  })).join('');
+  $('map').innerHTML = lines + grps;
+  layout();
+}
+// Largest tile size where no two position groups overlap and everything stays on screen
+function layout() {
+  const m = $('map'), rem = parseFloat(getComputedStyle(document.documentElement).fontSize), W = m.clientWidth, H = m.clientHeight;
+  const gs = ['mine', 'theirs'].flatMap(side => ZONE_IDS.map(z => ({ x: SPOTS[side][z][0] / 100 * W, y: SPOTS[side][z][1] / 100 * H, n: inZone(side, z).length })));
+  const gap = .75 * rem, lbl = 1.25 * rem, wOf = (g, tw) => (g.n ? g.n * tw + (g.n - 1) * gap + 1.15 * rem : tw * .8) + lbl;
+  const extra = 3.45 * rem;
+  const fits = tw => gs.every((g, i) => {
+    const w = wOf(g, tw), h = tw * .8 + extra;
+    if (g.x - w / 2 < 0 || g.x + w / 2 > W || g.y - h / 2 < 0 || g.y + h / 2 > H) return false;
+    return gs.every((o, j) => j <= i || Math.abs(g.x - o.x) >= (w + wOf(o, tw)) / 2 + .5 * rem || Math.abs(g.y - o.y) >= h + .3 * rem);
+  });
+  const size = () => { let tw = 7.5 * rem; while (tw > 36 && !fits(tw)) tw -= 2; return tw; };
+  const tw = size();
+  m.classList.toggle('tight', tw < 5.4 * rem);
+  m.style.setProperty('--tw', tw + 'px');
+  fitNames();
+}
+
+function score() {
+  const pips = s => SIM.units.filter(u => u.side === s).map(u => `<i class="${tile(u.id)?.classList.contains('dead') ? 'x' : ''}"></i>`).join('');
+  const n = s => document.querySelectorAll(`.tile.${s}:not(.dead)`).length;
+  $('sA').innerHTML = `<span class="who">YOU</span><b>${n('mine')}</b><span class="pips">${pips('mine')}</span>`;
+  $('sB').innerHTML = `<span class="pips">${pips('theirs')}</span><b>${n('theirs')}</b><span class="who">${esc(GHOST.name.toUpperCase())}</span>`;
+}
+
+// Arena-relative centre of an element
+function at(el, dy = 0) {
+  const r = el.getBoundingClientRect(), a = $('arena').getBoundingClientRect();
+  return [r.left - a.left + r.width / 2, r.top - a.top + r.height / 2 + dy * r.height];
+}
+function spawn(cls, html, [x, y], ms) {
+  const d = document.createElement('div'); d.className = cls; d.innerHTML = html;
+  d.style.left = x + 'px'; d.style.top = y + 'px'; $('arena').appendChild(d);
+  setTimeout(() => d.remove(), ms); return d;
+}
+function floater(el, text, good) { if (!skipping) spawn('floater ' + (good ? 'good' : 'bad'), esc(text), at(el, -.2), 1000); }
+function callout(el, text, side) {
+  if (skipping) return;
+  const c = spawn('callout', esc(text), at(el, side === 'mine' ? -.62 : .62), 1000), w = c.offsetWidth / 2 + 4, aw = $('arena').clientWidth;
+  c.style.left = Math.min(Math.max(parseFloat(c.style.left), w), aw - w) + 'px'; // keep it on screen at the edges
+}
+// The tip of a tile's barrel, where its shots come from
+function muzzle(t) {
+  const g = t.querySelector?.('.gun'); if (!g) return at(t);
+  const r = g.getBoundingClientRect(), a = $('arena').getBoundingClientRect();
+  return [(t.classList.contains('theirs') ? r.left : r.right) - a.left, r.top + r.height * .42 - a.top];
+}
+function tracer(from, to, mine, miss) {
+  const [x1, y1] = muzzle(from), col = mine ? 'var(--primary)' : 'var(--enemy)';
+  let [x2, y2] = at(to);
+  if (miss) { // a stray: sails past the target, a little off to one side, and a bit beyond
+    const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1, off = (to.offsetWidth * .55 + Math.random() * to.offsetWidth * .35) * (Math.random() < .5 ? -1 : 1);
+    x2 += -dy / L * off + dx / L * 30; y2 += dx / L * off + dy / L * 30;
+  }
+  const svg = $('fx'), l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  Object.entries({ x1, y1, x2, y2, pathLength: 1, 'stroke-dasharray': 1, 'stroke-width': miss ? 1.5 : 2.5 }).forEach(([k, v]) => l.setAttribute(k, v));
+  if (miss) l.classList.add('miss');
+  l.style.stroke = col; l.style.color = col; svg.appendChild(l);
+  l.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: 80, fill: 'forwards' });
+  l.animate([{ opacity: 1 }, { opacity: 1, offset: .4 }, { opacity: 0 }], { duration: 380, fill: 'forwards' }).onfinish = () => l.remove();
+}
+function burst(el, mine) {
+  const [x, y] = at(el), col = mine ? 'var(--primary)' : 'var(--enemy)';
+  for (let i = 0; i < 12; i++) {
+    const p = spawn('pt', '', [x, y], 600), a = Math.random() * Math.PI * 2, d = 30 + Math.random() * 60;
+    p.style.background = i % 3 ? col : 'var(--accent)';
+    p.animate([{ transform: 'translate(-50%,-50%) scale(1)', opacity: 1 }, { transform: `translate(calc(-50% + ${Math.cos(a) * d}px), calc(-50% + ${Math.sin(a) * d}px)) scale(.3) rotate(${d * 4}deg)`, opacity: 0 }],
+      { duration: 450 + Math.random() * 150, easing: 'cubic-bezier(.1,.8,.3,1)', fill: 'forwards' });
+  }
+}
+function shake(px) {
+  const n = $('map'); n.animate([{ transform: 'none' }, { transform: `translate(${-px}px,${px / 2}px)` }, { transform: `translate(${px * .8}px,${-px / 2}px)` }, { transform: `translate(${-px / 3}px,${px / 4}px)` }, { transform: 'none' }], { duration: 240 + px * 10 });
+}
+async function band(text, sub = '', cls = '') {
+  if (skipping) return;
+  const b = $('band'); b.className = 'band ' + cls;
+  b.innerHTML = `<span>${text}</span>${sub ? `<small>${sub}</small>` : ''}`;
+  b.hidden = true; void b.offsetWidth; b.hidden = false; sfx.band();
+  await sleep(1300); b.hidden = true;
+}
+
+// Live HP during playback (the sim's numbers are end-of-round)
+let HP = {};
+function setHp(id, hp) {
+  HP[id] = hp; const u = U(id), f = tile(id)?.querySelector('.hpb i'); if (!f) return;
+  f.style.width = Math.max(0, hp / u.maxHp * 100) + '%'; f.classList.toggle('low', hp / u.maxHp < .35);
+  f.nextElementSibling.textContent = Math.max(0, Math.round(hp));
+}
+function pop(el, text, cls) { if (!skipping) spawn('dmg ' + cls, esc(text), at(el.querySelector('.em'), -.1 + (Math.random() - .5) * .3), 800); }
+function clearAim() { document.querySelectorAll('.tile.aim, .tile.marked').forEach(t => t.classList.remove('aim', 'marked')); }
+
+// Lining up a new target: brackets snap onto them for a moment
+function aim(e) {
+  if (skipping) return;
+  const t = tile(e.to); if (!t || t.classList.contains('dead')) return;
+  t.classList.remove('marked'); void t.offsetWidth; t.classList.add('marked');
+  clearTimeout(t._mk); t._mk = setTimeout(() => t.classList.remove('marked'), 450 / speed);
+}
+// One burst: a tracer per bullet (strays for misses), HP drops as each one lands. Doesn't block, so fights overlap.
+function setMag(id, frac, ms = 120) {
+  const b = tile(id).querySelector('.magb'), i = b.firstElementChild;
+  i.style.transition = `height ${ms}ms linear, background .2s`; i.style.height = frac * 100 + '%';
+  b.classList.toggle('low', frac <= .25);
+}
+function shot(e) {
+  const st = tile(e.from), tt = tile(e.to), mine = U(e.from).side === 'mine';
+  if (e.ammo != null) setMag(e.from, e.ammo / U(e.from).mag, skipping ? 0 : 120);
+  if (skipping) return setHp(e.to, e.hp);
+  st.classList.add('firing'); clearTimeout(st._fr); st._fr = setTimeout(() => st.classList.remove('firing'), 300 / speed);
+  let hp = e.hp + e.dmg;
+  e.b.forEach((d, k) => setTimeout(() => {
+    if (skipping) return;
+    tracer(st, tt, mine, !d); spawn('flash-m', '', muzzle(st), 120); if (k === 0 || (d && k < 3)) sfx.shot(mine);
+    if (d) {
+      hp -= d; setHp(e.to, Math.max(hp, e.hp)); if (k < 3 || e.hs) sfx.hit(e.hs && k === e.b.length - 1);
+      tt.querySelector('.em').animate([{ transform: 'none' }, { transform: 'translate(3px,-2px)' }, { transform: 'translate(-2px,1px)' }, { transform: 'none' }], { duration: 140 });
+    }
+    if (k === e.b.length - 1) {
+      setHp(e.to, e.hp);
+      if (!e.dmg) pop(tt, 'MISS', 'miss');
+      else if (!e.hs) pop(tt, '-' + e.dmg, '');
+      else if (e.hp > 0) pop(tt, 'HEADSHOT', 'hs');
+    }
+  }, k * (e.cad || 70) / speed));
+}
+// The killing blow: hit-stop, burst, shake, settle
+async function kill(e, slow, big) {
+  const v = U(e.victim), k = e.killer ? U(e.killer) : null, kt = k && tile(k.id), vt = tile(v.id), mine = v.side === 'theirs';
+  const settle = () => {
+    setHp(v.id, 0); vt.classList.remove('flash', 'solo', 'marked', 'firing'); vt.classList.add('dead');
+    kt?.querySelector('.ticks').insertAdjacentHTML('beforeend', '<i></i>'); score();
+  };
+  if (skipping) return settle();
+  if (e.hs) pop(vt, 'HEADSHOT', 'hs');
+  vt.classList.add('flash');
+  await new Promise(r => setTimeout(r, big ? 180 : 80)); // hit-stop: a beat of stillness sells the impact
+  settle(); burst(vt, mine); shake(big ? 9 : slow ? 6 : 4); sfx.kill(mine, big);
+  if (e.tag) callout(kt || vt, e.tag, k ? k.side : v.side);
+  vt.animate([{ transform: 'none' }, { transform: `translateY(${v.side === 'theirs' ? -10 : 10}px) rotate(${Math.random() > .5 ? 4 : -4}deg)` }, { transform: 'none' }], { duration: 320, easing: 'ease-out' });
+  if (slow || big) await sleep(slow ? 350 : 450); // only the last kill and clutch kills hold the frame
+}
+function dot(e) {
+  setHp(e.id, e.hp);
+  if (skipping || e.kind === 'gas') return;                  // gas just drains the bars; fire gets a small number
+  pop(tile(e.id), '-' + e.dmg, 'burn');
+}
+function overtime() {
+  $('arena').classList.add('ot'); $('rd').classList.add('clutch'); $('rd').textContent = 'OVERTIME';
+  if (!skipping) band('OVERTIME', 'DAMAGE RAMPS · GAS IN');
+}
+function heal(e) {
+  setHp(e.to, e.hp);
+  if (skipping || tile(e.to).classList.contains('dead')) return;
+  pop(tile(e.to), '+' + e.amt, 'heal'); sfx.heal();
+}
+// A gadget going off: a callout with its icon over the user, then whatever it did
+function gcall(el, op, text, side, bad) {
+  if (skipping || !el) return;
+  const c = spawn('gcall' + (bad ? ' bad' : ''), `<i>${gadgetIcon(op)}</i>${esc(text)}`, at(el, side === 'mine' ? -.62 : .62), 1000), w = c.offsetWidth / 2 + 4, aw = $('arena').clientWidth;
+  c.style.left = Math.min(Math.max(parseFloat(c.style.left), w), aw - w) + 'px';
+}
+function spendIcons(ids) { (ids || []).forEach(id => tile(id)?.querySelector('.gd')?.classList.add('spent')); }
+function pingIcon(id) { const g = tile(id)?.querySelector('.gd'); if (!g) return; g.classList.remove('ping'); void g.offsetWidth; g.classList.add('ping'); }
+function gadget(e) {
+  const u = U(e.id), t = tile(e.id), mine = u.side === 'mine';
+  (e.hits || []).forEach(h => setHp(h.id, h.hp));
+  if (e.marks && !e.block) e.marks.forEach(id => { const x = U(id); if (x.side !== u.side && x.rev) tile(id)?.classList.add('revealed'); });
+  if (e.breach) { const r = document.querySelector(`.lines .site.${e.breach === 'mine' ? 'a' : 'b'}`); r?.classList.remove('walled'); }
+  if (skipping) return spendIcons(e.spent);
+  if (!e.quiet) { pingIcon(e.id); gcall(t, u.op, e.text, u.side); sfx.buff(); }
+  (e.hits || []).forEach(h => { const tt = tile(h.id); tracer(t, tt, mine); pop(tt, '-' + h.dmg, ''); sfx.hit(false); });
+  if (e.conc) e.marks.forEach(id => { const x = tile(id); x.classList.remove('conc'); void x.offsetWidth; x.classList.add('conc'); });
+  if (e.marks && !e.block && !e.conc) e.marks.forEach(id => { const x = tile(id); if (x && U(id).side === u.side) return; x && x.querySelector('.em').animate([{ filter: 'brightness(2)' }, { filter: 'none' }], { duration: 400 }); });
+  if (e.block) setTimeout(() => { if (skipping) return; pingIcon(e.block.id); gcall(tile(e.block.id), e.block.op, e.block.text, U(e.block.id).side, true); sfx.toggle && sfx.aim(); }, 380 / speed);
+  if (e.breach) { const r = document.querySelector(`.lines .site.${e.breach === 'mine' ? 'a' : 'b'}`); r?.animate([{ strokeWidth: 8, stroke: 'var(--accent)' }, { strokeWidth: 1 }], { duration: 700 }); shake(6); sfx.kill(mine, false); }
+  setTimeout(() => spendIcons(e.spent), 500 / speed);
+}
+// Setup: everyone's placed gadgets light up at once
+async function setup(e) {
+  if (skipping || !e.ids.length) return;
+  e.ids.forEach(id => pingIcon(id)); sfx.plant();
+  await sleep(450);
+}
+// Opening utility (frag, claymore)
+async function util(e) {
+  const ft = tile(e.from), tt = tile(e.to);
+  setHp(e.to, e.hp);
+  if (skipping) return spendIcons(e.spent);
+  callout(ft, e.label, U(e.from).side); sfx.shot(U(e.from).side === 'mine');
+  if (e.block) { setTimeout(() => { pingIcon(e.block.id); gcall(tile(e.block.id), e.block.op, e.block.text, U(e.block.id).side, true); spendIcons(e.spent); }, 300 / speed); return; }
+  if (e.fx === 'smoke') { const c = spawn('smokecloud', '', at(ft), 3000 / speed); c.style.setProperty('--sz', ft.offsetWidth * 2.6 + 'px'); return; }
+  tracer(ft, tt, U(e.from).side === 'mine');
+  if (e.fx === 'flash') { tt.querySelector('.em').animate([{ filter: 'brightness(4) saturate(0)' }, { filter: 'none' }], { duration: 1500 / speed }); pop(tt, 'BLIND', 'miss'); return; }
+  if (e.missed) { pop(tt, 'MISSED', 'miss'); return; }
+  if (e.fx === 'breach') { pop(tt, 'EXPOSED', 'hs'); tt.classList.add('revealed'); return; }
+  pop(tt, '-' + e.dmg, ''); sfx.hit(false);
+}
+
+const CROSS_SPOT = { Flank: 'Roam', Roam: 'Flank' };
+// Routes each position walks from its own site to its spot (% of the map), following the schematic's lines
+const PATHS = {
+  mine: {
+    Anchor:  [[5, 50], [16, 50]],
+    Support: [[5, 50], [9, 62], [9, 83]],
+    Entry:   [[5, 50], [28, 50], [65, 50]],
+    Flank:   [[5, 50], [16, 31], [16, 17], [38, 17]],
+    Roam:    [[5, 50], [16, 69], [16, 83], [38, 83]],
+  },
+};
+PATHS.theirs = Object.fromEntries(Object.entries(PATHS.mine).map(([z, pts]) => [CROSS_SPOT[z] || z, pts.map(([x, y]) => [100 - x, y])]));
+const SETUP_ORDER = { Anchor: 0, Support: 120, Flank: 220, Roam: 220, Entry: 320 };
+
+// Players walk out of their own site to their positions, then plant
+async function intro() {
+  if (skipping) return;
+  const m = $('map'), W = m.clientWidth, H = m.clientHeight;
+  let longest = 0;
+  document.querySelectorAll('.grp').forEach(g => {
+    const side = g.dataset.side, z = g.dataset.zone, pts = PATHS[side][z];
+    // Keyframe offsets by real on-screen distance so the walk speed is steady
+    const seg = pts.slice(1).map((p, k) => Math.hypot((p[0] - pts[k][0]) * W / 100, (p[1] - pts[k][1]) * H / 100));
+    const total = seg.reduce((a, b) => a + b, 0) || 1;
+    let acc = 0;
+    const frames = pts.map((p, k) => { if (k) acc += seg[k - 1]; return { left: p[0] + '%', top: p[1] + '%', offset: acc / total, opacity: k ? 1 : 0 }; });
+    frames[0].opacity = 0; if (frames[1]) frames[1].opacity = 1;
+    const dur = 350 + total * 1.1, delay = SETUP_ORDER[z] * .7;
+    longest = Math.max(longest, dur + delay);
+    g.querySelector('.zl').animate([{ opacity: 0 }, { opacity: 1 }], { duration: 250, delay: delay + dur, fill: 'backwards' });
+    const walk = g.animate(frames, { duration: dur, delay, easing: 'cubic-bezier(.45,0,.25,1)', fill: 'backwards' });
+    walk.onfinish = () => {
+      if (skipping) return;
+      g.animate([{ scale: 1.12 }, { scale: 1 }], { duration: 260, easing: 'cubic-bezier(.3,1.6,.5,1)' });
+      if (g.querySelector('.tile')) sfx.plant();
+    };
+  });
+  await sleep(longest + 250);
+  document.querySelectorAll('.grp, .grp .zl').forEach(g => g.getAnimations().forEach(a => a.finish())); // never leave anyone mid-walk or invisible
+}
+async function boosts(notes) {
+  // All boosts pop together in one beat (the opening was too long one by one)
+  if (skipping || !notes.length) return;
+  for (const e of notes) {
+    const u = U(e.id), good = u.side === 'mine';
+    if (e.team) SIM.units.filter(x => x.side === u.side).forEach(x => { const t = tile(x.id); t.classList.remove('buffed'); void t.offsetWidth; t.classList.add('buffed'); floater(t, e.val, good); });
+    else {
+      const t = tile(u.id); t.classList.remove('buffed'); void t.offsetWidth; t.classList.add('buffed');
+      if (/OPEN$/.test(e.text)) callout(t, 'OPEN LANE', u.side);
+      floater(t, e.val, good);
+    }
+  }
+  sfx.buff();
+  await sleep(800);
+}
+
+function reload(e, pace) {
+  if (skipping) return setMag(e.id, 1, 0);
+  const t = tile(e.id), ms = e.dur * pace / speed; t.classList.add('reloading');
+  setMag(e.id, 0, 0); requestAnimationFrame(() => requestAnimationFrame(() => setMag(e.id, 1, ms))); // empty, then fills over the reload
+  setTimeout(() => t.classList.remove('reloading'), ms);
+}
+async function play(id) {
+  const live = () => id === runId, ev = SIM.ev, resume = RESUME;
+  RESUME = 0; CUR = 0;
+  if (resume) skipping = true;   // fast-forward to where they left
+  else saveProg();
+  if (!skipping) document.querySelectorAll('.grp').forEach(g => g.style.visibility = 'hidden');
+  await band(`ROUND ${RUN.round}`, `VS ${esc(GHOST.name.toUpperCase())} ${GHOST.w}-${GHOST.l}`);
+  document.querySelectorAll('.grp').forEach(g => g.style.visibility = '');
+  if (!live()) return;
+  await intro();
+  if (!live()) return;
+  await boosts(ev.filter(e => e.t === 'note'));
+  let clutch = false, now = 0, fired = false;
+  const PACE = 4.26; // real playback ms per sim ms: sized so the average round runs ~30s at 1x (bursts keep their real fire rate)
+  for (let i = 0; i < ev.length; i++) {
+    if (!live()) return;
+    const e = ev[i];
+    if (resume && i === resume && e.t !== 'result') skipping = false;
+    CUR = i; if (e.t === 'kill' || e.t === 'result') saveProg();
+    if (e.at != null && e.at > now) { await sleep((e.at - now) * PACE * (clutch ? 1.6 : 1)); now = e.at; }
+    if (!live()) return;
+    if (e.t === 'clutch' && !clutch) $('rd').textContent = `${U(e.id).name.toUpperCase()} LAST ALIVE`;
+    // Before first contact, utility and gadgets get their own beat; once guns are out they play over the fight
+    if (e.t === 'shot') fired = true;
+    if (e.t === 'util') { util(e); if (!fired) await sleep(400); }
+    if (e.t === 'setup') await setup(e);
+    if (e.t === 'gadget') { gadget(e); if (!e.quiet && !fired) await sleep(e.block ? 500 : 400); }
+    if (e.t === 'aim') aim(e);
+    if (e.t === 'shot') shot(e);
+    if (e.t === 'heal') heal(e);
+    if (e.t === 'reload') reload(e, PACE * (clutch ? 1.6 : 1));
+    if (e.t === 'dot') dot(e);
+    if (e.t === 'ot') overtime();
+    if (e.t === 'kill') {
+      await kill(e, clutch, !ev.slice(i + 1).some(x => x.t === 'kill'));
+      // Spotlight a clutch only once it's winnable: last player alive vs one or two
+      const a = document.querySelectorAll('.tile.mine:not(.dead)').length, b = document.querySelectorAll('.tile.theirs:not(.dead)').length;
+      if (!clutch && a && b && Math.min(a, b) === 1 && Math.max(a, b) <= 2) {
+        clutch = true;
+        const solo = document.querySelector(`.tile.${a === 1 ? 'mine' : 'theirs'}:not(.dead)`), u = U(solo.dataset.u), n = a === 1 ? b : a;
+        solo.classList.add('solo');
+        $('arena').classList.add('clutch'); $('rd').classList.add('clutch'); $('rd').textContent = `CLUTCH 1v${n}`;
+        await band(`CLUTCH 1v${n}`, esc(u.name.toUpperCase()));
+        if (!skipping) { sfx.beat(); heart = setInterval(sfx.beat, 950 / speed); }
+      }
+    }
+    if (e.t === 'result') {
+      clearInterval(heart); heart = null;
+      if (!skipping) { e.win ? sfx.win() : sfx.loss(); await band(e.win ? 'ROUND WON' : 'ROUND LOST', '', e.win ? 'won' : 'lost'); }
+      if (live()) showResult(e);
+    }
+  }
+}
+
+// Scoreboard: who did what this round, worked out from the event log
+function scoreboard() {
+  const st = Object.fromEntries(SIM.units.map(u => [u.id, { k: 0, dmg: 0, shots: 0, hits: 0, hs: 0, heal: 0 }]));
+  for (const e of SIM.ev) {
+    if (e.t === 'shot' && st[e.from]) { const x = st[e.from]; x.dmg += e.dmg; x.shots += e.b.length; x.hits += e.b.filter(Boolean).length; if (e.hs) x.hs++; }
+    if (e.t === 'util' && e.dmg && st[e.from]) st[e.from].dmg += e.dmg;
+    if (e.t === 'heal' && st[e.from]) st[e.from].heal += e.amt;
+    if (e.t === 'kill' && e.killer && st[e.killer]) st[e.killer].k++;
+  }
+  const rows = side => SIM.units.filter(u => u.side === side).map(u => ({ u, ...st[u.id] })).sort((a, b) => b.k - a.k || b.dmg - a.dmg);
+  const top = { mine: Math.max(0, ...rows('mine').map(x => x.k)), theirs: Math.max(0, ...rows('theirs').map(x => x.k)) };
+  const item = u => {
+    const n = u.buff?.name, it = ITEMS[n]; if (!it) return '–';
+    const f = Math.round(u.fx), pl = (n, w, ws = w + 's') => `${n} ${n === 1 ? w : ws}`, ue = SIM.ev.find(e => e.t === 'util' && e.from === u.id);
+    const r = it.throw ? (!ue ? 'Not used' : ue.block ? 'Blocked' : ue.missed ? 'Missed' : it.boom ? `${ue.dmg} dmg` : it.site ? `+${f} dmg` : pl(f, 'enemy miss', 'enemy misses'))
+      : it.hp ? `+${it.hp} HP`
+      : it.burn ? `${f} burn dmg`
+      : n === 'Prize Money' ? (top[u.side] && u.kills === top[u.side] ? '+¢4' : 'No bonus')
+      : it.magMul ? pl(Math.max(0, Math.floor(u.spent / (u.mag / it.magMul)) - u.reloads), 'fewer reload')
+      : it.rpmMul > 1 || it.adren ? '+' + pl(f, 'shot')
+      : it.hit ? '+' + pl(f, 'hit')
+      : it.armor || it.dr ? `${f} dmg blocked`
+      : `+${f} dmg`;
+    return `<span class="itn">${esc(n)}</span> ${r}`;
+  };
+  const mvp = rows('mine').concat(rows('theirs')).sort((a, b) => b.k - a.k || b.dmg - a.dmg)[0]?.u;
+  const tr = x => `<tr class="${x.u.alive ? '' : 'dead'} ${x.u === mvp ? 'mvp' : ''}"><td class="sbname">${opIcon(x.u.op)}<span style="color:var(--r-${x.u.rarity})">${esc(x.u.name)}</span></td>
+    <td>${x.k}</td><td>${x.dmg}</td><td>${x.shots ? Math.round(100 * x.hits / x.shots) + '%' : '–'}</td><td>${x.hs}</td><td>${x.heal || '–'}</td><td class="itc">${item(x.u)}</td></tr>`;
+  const head = label => `<tr class="th"><th>${label}</th><th title="Kills">K</th><th title="Damage dealt">DMG</th><th title="Bullets that hit">ACC</th><th title="Headshot kills">HS</th><th title="Healing done">HEAL</th><th class="itc" title="What their one-time item did">ITEM</th></tr>`;
+  return `<table class="board">${head('YOU')}${rows('mine').map(tr).join('')}${head(esc(GHOST.name.toUpperCase()))}${rows('theirs').map(tr).join('')}</table>`;
+}
+function showResult(e) {
+  LAST = e;
+  const champ = e.win && !RUN.endless && RUN.wins + 1 >= 10; // 10th win: offer Endless
+  const w = RUN.wins + (e.win ? 1 : 0), r = $('result');
+  const hp0 = RUN.hp ?? Math.max(1, LIVES - 2 * RUN.losses), hpAfter = e.win ? hp0 : Math.max(0, hp0 - lossCost(RUN.round));
+  const mine = SIM.units.filter(u => u.side === 'mine'), best = Math.max(...mine.map(u => u.kills));
+  r.className = 'result ' + (e.win ? 'win' : 'loss');
+  r.innerHTML = `<div class="box"><h1>${e.win ? 'WON' : 'LOST'}</h1>
+    <div class="rec"><span><small>WINS</small><b>${w}${RUN.endless ? ' ∞' : '/10'}</b></span>
+      <span><small>LIVES</small><span class="lives">${Array.from({ length: LIVES }, (_, i) => `<i class="${i < hpAfter ? '' : i < hp0 ? 'x now' : 'x'}"></i>`).join('')}${e.win ? '' : `<em>-${lossCost(RUN.round)}</em>`}</span></span></div>
+    <div class="kills">${mine.map(u => `<div class="kp ${best && u.kills === best ? 'mvp' : ''} ${u.alive ? '' : 'dead'}">${opIcon(u.op)}<span class="nmw"><span class="nm">${esc(u.name)}</span></span><em>${u.kills}K</em></div>`).join('')}</div>
+    ${champ ? '<div class="why"><b>RUN WON!</b> Keep playing in Endless or start a new run.</div>' : ''}
+    ${scoreboard()}
+    <div class="acts"><button class="btn" id="replayBtn">REPLAY</button><button class="btn" id="statsBtn">STATS</button>${champ
+      ? '<button class="btn" id="newRunBtn">NEW RUN</button><button class="btn go" id="endlessBtn">ENDLESS ▶</button>'
+      : `${RUN.endless ? '<button class="btn" id="newRunBtn">END RUN</button>' : ''}<button class="btn go" id="contBtn">CONTINUE ▶</button>`}</div></div>`;
+  r.hidden = false; $('band').hidden = true; fitNames();
+}
+
+function start() {
+  setPaused(false); pausedBy = null; runId++; skipping = false; clearInterval(heart); heart = null;
+  SIM = simulate();
+  $('result').hidden = true; $('band').hidden = true; $('fx').innerHTML = '';
+  $('arena').classList.remove('clutch', 'ot'); $('rd').classList.remove('clutch'); $('rd').textContent = `ROUND ${RUN.round}`;
+  HP = {}; renderBoard(); score();
+  setTimeout(() => play(runId), 200);
+}
+
+// Shrink each name until it fits; at the 12px floor, condense it instead of cutting it.
+function fitNames() {
+  document.querySelectorAll('.nm, .fit').forEach(n => {
+    n.style.fontSize = ''; n.style.transform = '';
+    const avail = n.parentElement.clientWidth - 2, w = n.offsetWidth; if (!w || w <= avail) return;
+    const base = parseFloat(getComputedStyle(n).fontSize), fs = Math.max(12, Math.floor(base * avail / w * 10) / 10);
+    n.style.fontSize = fs + 'px';
+    const w2 = n.offsetWidth; if (w2 > avail) n.style.transform = `scaleX(${(avail / w2).toFixed(3)})`;
+  });
+}
+
+function showPop(u, t) {
+  const pop = $('pop'), r = t.getBoundingClientRect(), hp = Math.max(0, Math.round(HP[u.id] ?? u.maxHp));
+  const st = (ico, v, title) => `<span title="${title}">${ICO[ico]}<b>${v}</b></span>`;
+  const tags = [...(u.passives || []),
+    ...Object.entries((u.gear || []).reduce((a, x) => (a[x.id] = (a[x.id] || 0) + 1, a), {})).map(([id, n]) => GEAR[id].name + (n > 1 ? ' ×' + n : '')),
+    u.buff?.name].filter(Boolean);
+  pop.innerHTML = `<div class="ph"><b style="color:var(--r-${u.rarity})">${esc(u.name)}</b><span class="mut">${esc(u.gun)}</span></div>
+    <div class="pst">${st('hp', `${hp}/${u.maxHp}`, 'Health')}${st('arm', u.block, 'Armor')}${st('dmg', u.dmg, 'Damage per bullet')}${st('rpm', u.rpm, 'Rounds per minute')}${st('mag', u.mag, 'Magazine')}</div>
+    ${u.rpx ? `<div class="ln"><b>${ROLE_PASSIVES[u.rpx.id].name}</b> ${ROLE_PASSIVES[u.rpx.id].info(u.rpx.v)}</div>` : ''}
+    ${tags.length ? `<div class="ln">${tags.map(esc).join(' · ')}</div>` : ''}`;
+  pop.hidden = false;
+  const w = pop.offsetWidth, h = pop.offsetHeight;
+  pop.style.left = `${Math.min(Math.max(r.left + r.width / 2 - w / 2, 6), innerWidth - w - 6)}px`;
+  pop.style.top = `${r.top - h - 8 < 6 ? r.bottom + 8 : r.top - h - 8}px`;
+}
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-u],#speedBtn,#pauseBtn,#sndBtn,#replayBtn,#statsBtn,#contBtn,#endlessBtn,#newRunBtn');
+  if (t?.id === 'statsBtn') { const on = $('result').classList.toggle('stats'); t.classList.toggle('on', on); t.textContent = on ? 'BACK' : 'STATS'; return; }
+  $('pop').hidden = true;
+  // A player's card pauses the fight; closing it resumes, unless you paused with the button yourself
+  if (t?.dataset.u) { if (!paused) { setPaused(true); pausedBy = 'card'; } return showPop(U(t.dataset.u), t); }
+  if (t?.id === 'pauseBtn') { setPaused(!paused); pausedBy = paused ? 'button' : null; return; }
+  if (pausedBy === 'card') { setPaused(false); pausedBy = null; }
+  if (!t) return;
+  if (t.id === 'sndBtn') { t.classList.toggle('on', sfx.toggle()); return; }
+  if (t.id === 'speedBtn') { speed = speed === 1 ? 2 : 1; t.textContent = `▶▶ ${speed}×`; t.classList.toggle('on', speed > 1); return; }
+  if (t.id === 'replayBtn') return start();
+  if (t.id === 'newRunBtn' && t.textContent === 'END RUN') { t.textContent = 'TAP TO CONFIRM'; t.classList.add('on'); return; } // ending Endless takes two taps
+  if (['contBtn', 'endlessBtn', 'newRunBtn'].includes(t.id)) {
+    // Report back to prep: it applies income, mastery, duo stacks and scaling gear
+    try { localStorage.setItem('battler.result', JSON.stringify({ round: RUN.round, win: !!LAST?.win, endless: t.id === 'endlessBtn', end: t.id === 'newRunBtn',
+      team: SIM.units.filter(u => u.side === 'mine').map(u => ({ pid: u.pid, kills: u.kills, alive: u.alive, buff: u.buff?.name || null })) })); } catch {}
+    try { localStorage.removeItem('battler.prog'); } catch {}
+    location.href = 'prep.html?t=' + Date.now();
+  }
+});
+addEventListener('resize', () => SIM && layout());
+
+Promise.all(Object.keys(OP_NAMES).map(k => fetch(`ops/${k}.svg`).then(r => r.text())
+  .then(t => SVG[k] = t.replace(/<switch>[\s\S]*?<\/foreignObject>/, '').replace('</switch>', ''))
+  .catch(() => {}))).then(start);
+</script>
+</body>
+</html>

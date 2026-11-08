@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>R6 Autobattler</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#080a0c">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="R6 Autobattler">
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* Same tokens as prep.html and battle.html */
+  :root {
+    --bg: hsl(220 20% 4%);
+    --card: hsl(220 18% 7%);
+    --fg: hsl(140 60% 70%);
+    --hi: hsl(140 30% 88%);
+    --primary: hsl(140 70% 55%);
+    --secondary: hsl(220 15% 11%);
+    --muted: hsl(140 18% 42%);
+    --accent: hsl(36 90% 55%);
+    --danger: hsl(0 70% 55%);
+    --border: hsl(140 30% 18%);
+  }
+  html { font-size: clamp(14px, min(100dvh / 26, 100vw / 54), 21px); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; overflow: hidden; overscroll-behavior: none; background: var(--bg); color: var(--fg); }
+  body { font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 1rem; line-height: 1.2;
+    -webkit-tap-highlight-color: transparent; user-select: none; }
+  button, input { font: inherit; color: inherit; }
+  button { background: none; border: 0; cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .crt { pointer-events: none; position: fixed; inset: 0; z-index: 90;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,.07) 2px, rgba(0,0,0,.07) 4px),
+                radial-gradient(ellipse at center, transparent 62%, rgba(0,0,0,.45) 100%); }
+
+  .app { height: 100dvh; max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 2.5rem; align-items: center;
+    padding: max(1rem, env(safe-area-inset-top)) max(2rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(2rem, env(safe-area-inset-left)); }
+
+  /* Left: the brand */
+  .brand { display: grid; gap: 1rem; justify-items: start; }
+  .brand svg { width: 4.2rem; height: 4.2rem; }
+  .brand h1 { font-size: 2.3rem; letter-spacing: .16em; color: var(--primary); line-height: 1.05; text-shadow: 0 0 1.2rem hsl(140 70% 55% / .35); }
+  .brand h1 span { display: block; color: var(--hi); font-size: 1rem; letter-spacing: .5em; margin-bottom: .3rem; text-shadow: none; }
+  .brand .tag { color: var(--muted); font-size: .86rem; }
+  .brand .credit { color: var(--muted); font-size: 12px; line-height: 1.4; max-width: 22rem; }
+  .brand .credit a { color: inherit; }
+
+  /* Right: one panel per view */
+  .panel { border: 1px solid var(--border); background: var(--card); padding: 1.3rem 1.4rem; display: grid; gap: .9rem; border-radius: 2px; }
+  .panel h2 { font-size: .86rem; letter-spacing: .3em; color: var(--muted); font-weight: 700; }
+  .mut { color: var(--muted); font-size: .86rem; }
+
+  .btn { border: 1px solid var(--border); height: 2.6rem; padding: 0 1rem; font-size: .9rem; letter-spacing: .14em; text-transform: uppercase; border-radius: 2px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: .5rem; white-space: nowrap; }
+  .btn:hover { border-color: var(--primary); }
+  .btn.go { background: var(--primary); border-color: var(--primary); color: var(--bg); }
+  .btn.go:hover { filter: brightness(1.1); }
+  .btn.big { height: auto; min-height: 3.4rem; padding: .5rem 1rem; flex-direction: column; gap: .25rem; font-size: 1.1rem; letter-spacing: .2em; }
+  .btn.warn { border-color: var(--accent); color: var(--accent); }
+  .btn.danger { border-color: var(--danger); color: var(--danger); }
+  .btn small { font-weight: 500; letter-spacing: .06em; font-size: .78rem; opacity: .8; }
+  .row { display: flex; gap: .6rem; }
+  .row > .btn { flex: 1; }
+
+  /* Login */
+  label { font-size: .86rem; letter-spacing: .2em; color: var(--muted); font-weight: 700; }
+  .field { display: flex; gap: .6rem; }
+  input { flex: 1; min-width: 0; height: 2.6rem; background: var(--bg); border: 1px solid var(--border); border-radius: 2px; padding: 0 .8rem; color: var(--hi); letter-spacing: .06em; user-select: text; }
+  input:focus { outline: none; border-color: var(--primary); }
+  .err { color: hsl(0 70% 70%); font-size: .86rem; }
+  .err:empty { display: none; }
+  .or { display: flex; align-items: center; gap: .7rem; color: var(--muted); font-size: .86rem; letter-spacing: .2em; }
+  .or::before, .or::after { content: ''; flex: 1; border-top: 1px solid var(--border); }
+  .soon { font-size: 12px; letter-spacing: .1em; color: var(--accent); font-weight: 500; }
+
+  /* Home */
+  .who { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+  .who b { color: var(--hi); font-size: 1.3rem; letter-spacing: .06em; overflow: hidden; text-overflow: ellipsis; }
+  .who span { color: var(--muted); font-size: .86rem; letter-spacing: .14em; white-space: nowrap; }
+  .last { border-left: 2px solid var(--primary); padding: .35rem .7rem; font-weight: 700; letter-spacing: .1em; color: var(--hi); font-size: .9rem; }
+  .last.lost { border-color: var(--danger); }
+  .last .plus { color: var(--primary); } .last .minus { color: var(--danger); }
+  .rank { display: grid; gap: .45rem; }
+  .rankRow { display: flex; align-items: center; gap: .7rem; }
+  .rhex { width: 2.4rem; height: 2.2rem; clip-path: polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0 50%); background: var(--rk);
+    display: grid; place-items: center; color: var(--bg); font-weight: 700; font-size: .95rem; }
+  .rname { font-weight: 700; font-size: 1.2rem; color: var(--rk); letter-spacing: .12em; }
+  .rbar { height: .4rem; background: var(--secondary); border-radius: 1px; overflow: hidden; }
+  .rbar i { display: block; height: 100%; background: var(--rk); }
+  .rsub { color: var(--muted); font-size: .86rem; }
+
+  /* Modes */
+  .mbtns { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; }
+  .mbtn { border: 1px solid var(--border); background: var(--bg); padding: 1rem .9rem; display: grid; gap: .45rem; text-align: left; border-radius: 2px; align-content: start; }
+  .mbtn b { font-size: 1.15rem; letter-spacing: .2em; color: var(--primary); }
+  .mbtn span { color: var(--muted); font-size: .86rem; line-height: 1.35; }
+  .mbtn:hover { border-color: var(--primary); }
+  .mbtn.rk { border-color: var(--accent); } .mbtn.rk b { color: var(--accent); }
+
+  /* Settings */
+  .set { display: grid; gap: .55rem; }
+  .set .line { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 2.4rem; }
+  .set .lbl { display: grid; gap: .15rem; min-width: 0; }
+  .set .lbl span { font-size: .9rem; letter-spacing: .14em; font-weight: 700; color: var(--fg); white-space: nowrap; }
+  .set .lbl small { font-size: .86rem; color: var(--muted); line-height: 1.3; }
+  .set .lbl small.bad { color: hsl(0 70% 70%); }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 2px; }
+  .seg button { height: 2.2rem; min-width: 3.4rem; padding: 0 .8rem; font-size: .86rem; letter-spacing: .12em; font-weight: 700; color: var(--muted); }
+  .seg button.on { background: var(--primary); color: var(--bg); }
+  .set .btn { height: 2.2rem; font-size: .86rem; }
+
+  .toast { position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); z-index: 95; background: var(--card); border: 1px solid var(--primary); padding: .45rem .9rem; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: calc(100% - 2rem); text-align: center; font-size: .9rem; }
+  .toast.show { opacity: 1; } .toast.bad { border-color: var(--danger); color: hsl(0 70% 75%); }
+
+  .rotate { display: none; position: fixed; inset: 0; place-items: center; text-align: center; padding: 1.5rem; color: var(--hi); letter-spacing: .25em; font-weight: 700; }
+  @media (orientation: portrait) { .app { display: none !important; } .rotate { display: grid; } }
+  @media (display-mode: fullscreen), (display-mode: standalone) { #fsLine { display: none !important; } }
+</style>
+</head>
+<body>
+<div class="crt"></div>
+
+<main class="app">
+  <section class="brand">
+    <svg viewBox="0 0 100 100" aria-hidden="true">
+      <circle cx="50" cy="50" r="30" fill="none" stroke="hsl(140 70% 55%)" stroke-width="5"/>
+      <path d="M50 8v32M50 60v32M8 50h32M60 50h32" stroke="hsl(140 70% 55%)" stroke-width="5"/>
+      <path d="M50 43l7 7-7 7-7-7z" fill="hsl(36 90% 55%)"/>
+    </svg>
+    <h1><span>R6</span>AUTOBATTLER</h1>
+    <div class="tag">Build a squad. Watch it fight.</div>
+    <div class="credit">Fan-made, not for profit. Title data from <a href="https://liquipedia.net/rainbowsix" target="_blank" rel="noopener">Liquipedia</a> (CC-BY-SA 3.0).</div>
+  </section>
+
+  <!-- Login -->
+  <section class="panel" id="vLogin" hidden>
+    <label for="name">CALLSIGN</label>
+    <div class="field">
+      <input id="name" maxlength="16" autocomplete="nickname" autocapitalize="off" spellcheck="false" placeholder="Your name">
+      <button class="btn go" id="guestBtn">PLAY</button>
+    </div>
+    <div class="err" id="nameErr"></div>
+    <button class="btn" data-back id="loginBack" hidden>BACK</button>
+    <div class="mut">Guest progress stays on this device.</div>
+    <div class="or">OR</div>
+    <div class="mut">Sign in to keep progress across devices <span class="soon">SOON</span></div>
+    <div class="row">
+      <button class="btn" data-provider="google">GOOGLE</button>
+      <button class="btn" data-provider="discord">DISCORD</button>
+      <button class="btn" data-provider="email">EMAIL</button>
+    </div>
+  </section>
+
+  <!-- Home -->
+  <section class="panel" id="vHome" hidden>
+    <div class="who"><b id="who"></b><span id="whoKind"></span></div>
+    <div class="last" id="last" hidden></div>
+    <div class="rank" id="rank"></div>
+    <button class="btn go big" id="playBtn"></button>
+    <div class="row"><button class="btn" id="setBtn">SETTINGS</button></div>
+  </section>
+
+  <!-- Mode select -->
+  <section class="panel" id="vModes" hidden>
+    <h2>NEW RUN</h2>
+    <div class="mbtns">
+      <button class="mbtn" data-mode="casual"><b>CASUAL</b><span>No rank. Just play.</span></button>
+      <button class="mbtn rk" data-mode="ranked"><b>RANKED</b><span>Win RP for good runs, lose it for bad ones.</span></button>
+    </div>
+    <div class="row"><button class="btn" data-back>BACK</button></div>
+  </section>
+
+  <!-- Settings -->
+  <section class="panel" id="vSettings" hidden>
+    <h2>SETTINGS</h2>
+    <div class="set">
+      <div class="line"><div class="lbl"><span>SOUND</span><small>Sound effects in fights</small></div>
+        <div class="seg" data-set="sound"><button data-v="1">ON</button><button data-v="0">OFF</button></div></div>
+      <div class="line"><div class="lbl"><span>FIGHT SPEED</span><small>Speed fights start at</small></div>
+        <div class="seg" data-set="speed"><button data-v="1">1×</button><button data-v="2">2×</button></div></div>
+      <div class="line" id="fsLine"><div class="lbl"><span>FULLSCREEN</span><small>Hide the browser bars</small></div>
+        <div class="seg" id="fsSeg"><button data-fs="1">ON</button><button data-fs="0">OFF</button></div></div>
+      <div class="line"><div class="lbl"><span>NAME</span><small id="acctName"></small></div>
+        <button class="btn" id="nameBtn">CHANGE</button></div>
+      <div class="line"><div class="lbl"><span>START OVER</span><small id="resetInfo"></small></div>
+        <div class="row" id="resetBtns"></div></div>
+    </div>
+    <div class="row"><button class="btn" data-back>BACK</button></div>
+  </section>
+</main>
+
+<div class="rotate">ROTATE YOUR DEVICE</div>
+<div class="toast" id="toast"></div>
+
+<script src="profile.js"></script>
+<script src="auth.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const get = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
+let toastT;
+function toast(msg, bad) {
+  const t = $('toast'); t.textContent = msg; t.className = 'toast show' + (bad ? ' bad' : '');
+  clearTimeout(toastT); toastT = setTimeout(() => t.className = 'toast', 2400);
+}
+
+// Settings shared with battle.html (sound on/off, default speed)
+const SETTINGS_KEY = 'battler.settings';
+const settings = () => ({ sound: true, speed: 1, ...(get(SETTINGS_KEY) || {}) });
+const saveSetting = (k, v) => { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...settings(), [k]: v })); } catch {} };
+
+// The finished run's result, left by prep.html; shown once on the home screen
+let over = get('battler.over'); try { localStorage.removeItem('battler.over'); } catch {}
+
+const VIEWS = ['vLogin', 'vHome', 'vModes', 'vSettings'];
+function show(v) {
+  if (v !== 'vSettings') confirming = false;
+  VIEWS.forEach(id => $(id).hidden = id !== v);
+  ({ vLogin: renderLogin, vHome: renderHome, vSettings: renderSettings })[v]?.();
+  const first = $(v).querySelector('input, .btn.go, .mbtn, .seg button');
+  if (matchMedia('(hover: hover)').matches) first?.focus();
+}
+
+/* ---------- Login ---------- */
+function renderLogin() {
+  const u = AUTH.user();
+  $('name').value = u?.name || ''; $('nameErr').textContent = '';
+  $('guestBtn').textContent = u ? 'SAVE' : 'PLAY'; $('loginBack').hidden = !u;
+}
+function playAsGuest() {
+  const err = AUTH.guest($('name').value.trim());
+  if (err) { $('nameErr').textContent = err; return; }
+  show('vHome');
+}
+$('name').addEventListener('keydown', e => { if (e.key === 'Enter') playAsGuest(); });
+$('name').addEventListener('input', () => $('nameErr').textContent = '');
+
+/* ---------- Home ---------- */
+function currentRun() {
+  const s = get('battler.save');
+  return s?.mode ? s : null;
+}
+function renderHome() {
+  const u = AUTH.user();
+  $('who').textContent = u.name; $('whoKind').textContent = u.kind === 'guest' ? 'GUEST' : '';
+  $('last').hidden = !over;
+  if (over) {
+    $('last').className = 'last' + (/^RUN OVER/.test(over.text) ? ' lost' : '');
+    $('last').innerHTML = esc(over.text) + (over.delta != null ? ` · <span class="${over.delta >= 0 ? 'plus' : 'minus'}">${over.delta >= 0 ? '+' : ''}${over.delta} RP</span>` : '');
+  }
+  $('rank').innerHTML = rankHTML(loadProfile().rp);
+  const run = currentRun();
+  $('playBtn').innerHTML = run
+    ? `CONTINUE <small>${run.mode === 'ranked' ? 'RANKED' : 'CASUAL'} · DAY ${run.round} · ${run.wins}-${run.losses} · ♥${run.hp ?? 10}</small>`
+    : 'PLAY';
+}
+
+/* ---------- Settings ---------- */
+let confirming = false; // START OVER asks once, saying what goes
+function renderSettings() {
+  const s = settings();
+  document.querySelectorAll('.seg[data-set]').forEach(g => g.querySelectorAll('button').forEach(b =>
+    b.classList.toggle('on', String(+s[g.dataset.set]) === b.dataset.v)));
+  $('fsLine').hidden = !document.documentElement.requestFullscreen; // e.g. iPhone Safari
+  $('fsSeg').querySelectorAll('button').forEach(b => b.classList.toggle('on', (b.dataset.fs === '1') === !!document.fullscreenElement));
+  const u = AUTH.user(); $('acctName').textContent = u ? `${u.name}${u.kind === 'guest' ? ' · guest' : ''}` : '';
+  const run = currentRun();
+  $('resetInfo').className = confirming ? 'bad' : '';
+  $('resetInfo').textContent = confirming
+    ? `${run ? 'Run and rank' : 'Rank'} will be lost. Sure?`
+    : run ? 'Ends your run, resets rank' : 'Resets rank to Silver V';
+  $('resetBtns').innerHTML = confirming
+    ? '<button class="btn" id="resetNo">CANCEL</button><button class="btn danger" id="resetYes">YES</button>'
+    : '<button class="btn danger" id="resetBtn">RESET</button>';
+}
+async function setFullscreen(on) {
+  try {
+    if (!on && document.fullscreenElement) await document.exitFullscreen();
+    if (on && !document.fullscreenElement) { await document.documentElement.requestFullscreen(); await screen.orientation?.lock?.('landscape'); }
+  } catch {}
+  renderSettings();
+}
+// Clears the run in progress and the rank. Keeps the name and settings.
+function resetProgress() {
+  ['battler.save', 'battler.run', 'battler.result', 'battler.phase', 'battler.prog', 'battler.over', 'battler.profile']
+    .forEach(k => { try { localStorage.removeItem(k); } catch {} });
+  over = null; confirming = false; toast('Started over'); show('vHome');
+}
+
+/* ---------- Input ---------- */
+document.addEventListener('click', async e => {
+  const t = e.target.closest('button'); if (!t) return;
+  if (t.id === 'guestBtn') return playAsGuest();
+  if (t.dataset.provider) { try { await AUTH.signIn(t.dataset.provider); show('vHome'); } catch (err) { toast(err.message, true); } return; }
+  if (t.id === 'playBtn') return currentRun() ? location.href = 'prep.html' : show('vModes');
+  if (t.id === 'setBtn') return show('vSettings');
+  if (t.dataset.back !== undefined) return show('vHome');
+  if (t.dataset.mode) {
+    try { localStorage.setItem('battler.start', t.dataset.mode); } catch {}
+    location.href = 'prep.html'; return;
+  }
+  const seg = t.closest('.seg[data-set]');
+  if (seg) { saveSetting(seg.dataset.set, seg.dataset.set === 'sound' ? t.dataset.v === '1' : +t.dataset.v); return renderSettings(); }
+  if (t.dataset.fs) return setFullscreen(t.dataset.fs === '1');
+  if (t.id === 'nameBtn') return show('vLogin');
+  if (t.id === 'resetBtn') { confirming = true; return renderSettings(); }
+  if (t.id === 'resetNo') { confirming = false; return renderSettings(); }
+  if (t.id === 'resetYes') return resetProgress();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && ($('vModes').hidden === false || $('vSettings').hidden === false)) show('vHome');
+});
+
+show(AUTH.user() ? 'vHome' : 'vLogin');
+</script>
+</body>
+</html>

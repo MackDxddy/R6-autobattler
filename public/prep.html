@@ -1,0 +1,1490 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Prep Phase Prototype</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#080a0c">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="R6 Autobattler">
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* Tokens mirror app/globals.css (terminal green + amber accent) */
+  :root {
+    --bg: hsl(220 20% 4%);
+    --card: hsl(220 18% 7%);
+    --fg: hsl(140 60% 70%);
+    --hi: hsl(140 30% 88%);
+    --primary: hsl(140 70% 55%);
+    --secondary: hsl(220 15% 11%);
+    --muted: hsl(140 18% 42%);
+    --accent: hsl(36 90% 55%);
+    --danger: hsl(0 70% 55%);
+    --border: hsl(140 30% 18%);
+    --r-common: hsl(140 15% 58%);
+    --r-rare: hsl(205 85% 62%);
+    --r-epic: hsl(280 70% 70%);
+    --r-legendary: hsl(36 90% 55%);
+    /* Same tint the app uses for weapon/gadget PNGs (.operator-icon-primary) */
+    --tint: brightness(0) saturate(100%) invert(65%) sepia(50%) saturate(500%) hue-rotate(92deg) brightness(.95);
+  }
+  /* Everything is in rem; the root scales with the screen */
+  html { font-size: clamp(14px, min(100dvh / 26, 100vw / 54), 21px); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; overflow: hidden; overscroll-behavior: none; background: var(--bg); color: var(--fg); }
+  body { font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 1rem; line-height: 1.2;
+    -webkit-tap-highlight-color: transparent; user-select: none; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  img { -webkit-user-drag: none; user-select: none; }
+  svg.i { width: 1em; height: 1em; fill: currentColor; flex: none; }
+  .crt { pointer-events: none; position: fixed; inset: 0; z-index: 90;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,.07) 2px, rgba(0,0,0,.07) 4px),
+                radial-gradient(ellipse at center, transparent 62%, rgba(0,0,0,.45) 100%); }
+
+  @keyframes flash { 0% { box-shadow: 0 0 0 2px var(--accent), 0 0 1.6rem hsl(36 90% 55% / .8); } 100% { box-shadow: 0 0 0 0 transparent; } }
+  @keyframes bump { 0% { transform: scale(1.4); color: var(--hi); } 100% { transform: scale(1); } }
+  .flash { animation: flash .9s ease-out; }
+  .bump { animation: bump .45s ease-out; display: inline-block; }
+
+  .app { height: 100dvh; max-width: 1600px; margin: 0 auto; display: grid; gap: .5rem;
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    padding: max(.45rem, env(safe-area-inset-top)) max(.7rem, env(safe-area-inset-right)) max(.45rem, env(safe-area-inset-bottom)) max(.7rem, env(safe-area-inset-left)); }
+
+  /* ---------- HUD ---------- */
+  .hud { display: flex; align-items: center; gap: 1rem; min-width: 0; }
+  .hud .grow { flex: 1; }
+  .chip { display: inline-flex; align-items: center; gap: .35rem; height: 2.2rem; white-space: nowrap; font-weight: 700; }
+  .chip small { font-size: .86rem; color: var(--muted); }
+  .chip.gold { color: var(--accent); font-size: 1.3rem; }
+  .chip.hp { color: var(--danger); letter-spacing: .05em; } .chip.hp .cost { color: var(--muted); margin-left: .4rem; }
+  .chip.win { color: var(--primary); }
+  .chip.streak { font-size: .86rem; letter-spacing: .08em; } .chip.streak.w { color: var(--primary); } .chip.streak.l { color: var(--danger); }
+  .chip.gold .int { font-size: .86rem; color: var(--muted); font-weight: 400; margin-left: .15rem; }
+
+
+  /* ---------- Trinkets ---------- */
+  .trkChip { color: var(--accent); font-size: .9rem; letter-spacing: .1em; }
+  .drop { position: fixed; inset: 0; z-index: 85; display: grid; place-items: center; background: hsl(220 18% 4% / .94); padding: 1rem; }
+  .drop .box { width: min(44rem, 100%); display: grid; gap: .8rem; text-align: center; }
+  .drop h2 { font-size: 1.3rem; letter-spacing: .2em; color: var(--accent); }
+  .drop .sub { color: var(--muted); font-size: .86rem; }
+  .tcards { display: grid; grid-template-columns: repeat(3, 1fr); gap: .8rem; }
+  .tcard { border: 1px solid var(--tc); border-top-width: 3px; background: var(--card); border-radius: 2px; padding: .8rem .6rem; display: grid; gap: .45rem; justify-items: center; align-content: start; }
+  .tcard:hover { box-shadow: 0 0 0 1px var(--tc), 0 0 1rem color-mix(in srgb, var(--tc) 40%, transparent); }
+  .tcard .tb { border: 1px solid var(--tc); color: var(--tc); font-weight: 700; padding: .25rem .45rem; letter-spacing: .08em; }
+  .tcard b { color: var(--hi); }
+  .tcard span { color: var(--muted); font-size: .86rem; line-height: 1.3; }
+  /* ---------- Mode select + rank ---------- */
+  .chip.mode { font-size: .86rem; letter-spacing: .12em; color: var(--muted); }
+  .modes { position: fixed; inset: 0; z-index: 85; display: grid; place-items: center; background: hsl(220 18% 4% / .95); padding: 1rem; }
+  .modes .box { width: min(40rem, 100%); display: grid; gap: .8rem; text-align: center; }
+  .modes .last { font-weight: 700; letter-spacing: .14em; color: var(--hi); }
+  .modes .plus { color: var(--primary); } .modes .minus { color: var(--danger); }
+  .rankRow { display: flex; align-items: center; justify-content: center; gap: .7rem; }
+  .rhex { width: 2.6rem; height: 2.4rem; clip-path: polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0 50%); background: var(--rk);
+    display: grid; place-items: center; color: var(--bg); font-weight: 700; }
+  .rname { font-weight: 700; font-size: 1.4rem; color: var(--rk); letter-spacing: .12em; }
+  .rbar { height: .4rem; width: min(22rem, 100%); margin: 0 auto; background: var(--secondary); border-radius: 1px; overflow: hidden; }
+  .rbar i { display: block; height: 100%; background: var(--rk); }
+  .rsub { color: var(--muted); font-size: .86rem; }
+  .mbtns { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; margin-top: .3rem; }
+  .mbtn { border: 1px solid var(--border); background: var(--card); padding: .9rem .8rem; display: grid; gap: .4rem; text-align: left; border-radius: 2px; }
+  .mbtn b { font-size: 1.2rem; letter-spacing: .2em; color: var(--primary); }
+  .mbtn span { color: var(--muted); font-size: .86rem; line-height: 1.3; }
+  .modes .credit { color: var(--muted); font-size: 12px; letter-spacing: .04em; }
+  .modes .credit a { color: inherit; }
+  .mbtn.rk { border-color: var(--accent); } .mbtn.rk b { color: var(--accent); }
+  .mbtn:hover { border-color: var(--primary); }
+  .chip.rd { letter-spacing: .14em; color: var(--hi); font-size: .9rem; }
+  .chip.rd small { font-size: .9rem; letter-spacing: .14em; color: var(--hi); }
+  button.chip { padding: 0 .7rem; border: 1px solid var(--border); border-radius: 2px; color: var(--hi); letter-spacing: .14em; font-size: .9rem; }
+  button.chip.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .mapChip .m { font-size: .86rem; letter-spacing: 0; }
+  .up { color: var(--primary); } .down { color: var(--danger); }
+  button.iconBtn { width: 2.2rem; padding: 0; justify-content: center; color: var(--muted); border: 0; }
+
+  /* ---------- Stage: synergy rail + the team row over the blueprint ---------- */
+  .stage { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: .6rem; min-height: 0; }
+  .rail, .team { position: relative; }
+  .rail { display: flex; flex-direction: column; align-items: center; gap: .35rem; min-height: 0; }
+  .syns { flex: 1; min-height: 0; display: flex; flex-flow: column wrap; align-content: center; gap: .3rem; }
+  .syn { width: 2.4rem; height: 2.1rem; flex: none; border: 1px solid var(--border); background: var(--secondary); border-radius: 2px; display: grid; place-items: center; color: var(--muted); font-weight: 700; }
+  .syn span { font-size: .86rem; line-height: 1; text-align: center; }
+  .syn span b { display: block; font-size: .86rem; }
+  .syn.on { color: var(--primary); border-color: var(--primary); background: hsl(140 70% 55% / .1); }
+  .syn.max { color: var(--accent); border-color: var(--accent); background: hsl(36 90% 55% / .1); }
+  .syn.sel { box-shadow: 0 0 0 1px var(--hi); }
+
+  .team { container-type: size; display: flex; align-items: center; justify-content: center; gap: .9rem; min-height: 0; }
+  .zg { --tw: min(calc((100cqw - var(--gapsW)) / var(--cols)), calc((100cqh - 5.6rem) * .76), 10rem);
+    display: flex; flex-direction: column; align-items: center; gap: .35rem; padding: .15rem; border-radius: 2px; }
+  .zg .row { display: flex; gap: .45rem; }
+  .zl { display: flex; flex-direction: column; align-items: center; gap: .1rem; padding: .1rem .4rem .2rem; }
+  .zl .zn { font-size: .86rem; font-weight: 700; letter-spacing: .06em; color: var(--hi); white-space: nowrap; }
+  .zl .zp { font-weight: 700; color: var(--primary); }
+  .zl.sel { border-color: var(--accent); }
+  .ghost .zl { visibility: hidden; }
+  .ghost .pad { width: 2.3rem; height: calc(var(--tw) / .76); border: 1px dashed hsl(0 50% 35%); border-radius: 2px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .3rem;
+    color: var(--danger); overflow: hidden; }
+  .ghost .pad b { font-size: 1.1rem; }
+  .ghost .pad span { writing-mode: vertical-rl; transform: rotate(180deg); font-size: .86rem; font-weight: 700; letter-spacing: .1em; white-space: nowrap; }
+  .team.moving .zg { outline: 1px dashed var(--primary); outline-offset: 1px; background: hsl(140 70% 55% / .07); }
+
+  /* ---------- Player tile: op portrait, name, power ---------- */
+  .tile { --rc: var(--r-common); position: relative; width: var(--tw); height: calc(var(--tw) / .76); display: flex; flex-direction: column;
+    background: hsl(220 15% 13% / .95); border: 1px solid var(--border); border-top: 3px solid var(--rc); border-radius: 2px; }
+  .tile.sel { border-color: var(--accent); border-top-color: var(--rc); box-shadow: 0 0 0 1px var(--accent); }
+  .tile .art { flex: 1; min-height: 0; display: grid; place-items: center; padding: 16% 16% 4%; }
+  .tile .art .op, .tile .art .sil { width: 100%; height: 100%; }
+  .tile .art .sil { fill: hsl(140 20% 18%); }
+  .tile .plate { padding: .15rem .15rem .4rem; display: flex; justify-content: center; overflow: hidden; }
+  .tcol { display: flex; flex-direction: column; align-items: center; gap: .2rem; }
+  .tst { display: flex; flex-direction: column; align-items: center; gap: .05rem; font-size: 12px; line-height: 1.15; color: var(--muted); white-space: nowrap; }
+  .tst > div { display: flex; gap: .45rem; }
+  .tst span { display: inline-flex; align-items: center; gap: .12rem; } .tst b { color: var(--fg); font-weight: 600; }
+  .tst svg { width: .62rem; height: .62rem; fill: none; stroke: currentColor; stroke-width: 1.8; }
+  .nm { display: inline-block; white-space: nowrap; font-weight: 700; font-size: 1rem; line-height: 1.15; color: var(--hi); transform-origin: center; }
+  .tile .lvl { position: absolute; top: .3rem; right: .3rem; }
+  .tile .star { position: absolute; top: .15rem; left: .3rem; color: var(--accent); font-size: .9rem; }
+  .tile .buff { position: absolute; left: .2rem; bottom: 1.9rem; width: 1.5rem; height: 1.5rem; border: 1px solid var(--accent); background: var(--bg); display: grid; place-items: center; }
+  .pop .mut { color: var(--muted); } .pop .warn { color: var(--accent); }
+  .tile .buff.txt { width: auto; padding: 0 .25rem; } .tile .buff.txt b { font-size: .75rem; color: var(--accent); letter-spacing: .04em; }
+  .tile .buff.wep { left: auto; right: .2rem; width: 2.4rem; }
+  .tile .buff.wep img { filter: invert(.86); }
+  .attx { font-size: 1.1rem; font-weight: 700; letter-spacing: .06em; color: var(--hi); border: 1px solid var(--border); padding: .2rem .35rem; border-radius: 2px; }
+  .tile .buff img { width: 80%; height: 80%; object-fit: contain; filter: var(--tint); }
+  .pow { position: absolute; left: 50%; bottom: -.7rem; transform: translateX(-50%); min-width: 2.6rem; padding: .05rem .35rem; text-align: center;
+    font-weight: 700; color: var(--accent); background: var(--bg); border: 1px solid var(--accent); border-radius: 2px; }
+
+  .op { display: block; color: var(--oc, var(--primary)); }
+  .op svg { width: 100%; height: 100%; display: block; }
+  .op svg path:not([fill]) { fill: hsl(140 35% 13%); }
+  .pips { display: inline-flex; gap: .18rem; }
+  .pips i { width: .45rem; height: .45rem; border: 1px solid var(--accent); display: block; transform: rotate(45deg); }
+  .pips i.on { background: var(--accent); }
+
+  /* ---------- Dock: bench + op slots ---------- */
+  .dock { display: flex; align-items: center; justify-content: center; gap: 1.4rem; }
+  .grp { display: flex; align-items: center; gap: .35rem; }
+  .lbl { font-size: .86rem; letter-spacing: .16em; color: var(--muted); }
+  .bslot { --rc: var(--r-common); overflow: hidden; width: 5.8rem; height: 2.5rem; display: flex; align-items: center; justify-content: center; padding: 0 .3rem;
+    background: hsl(220 15% 13% / .95); border: 1px solid var(--border); border-left: 3px solid var(--rc); border-radius: 2px; }
+  .bslot.empty { border: 1px dashed hsl(140 30% 12%); background: none; color: var(--primary); }
+  .bslot.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .sock { position: relative; width: 2.6rem; height: 2.5rem; display: grid; place-items: center; background: var(--secondary); border: 1px solid var(--border); border-radius: 2px; }
+  .sock .op { width: 1.8rem; height: 1.8rem; }
+  .sock .pips { position: absolute; bottom: .15rem; left: 50%; transform: translateX(-50%); }
+  .sock .pips i { width: .35rem; height: .35rem; }
+  .sock.empty { border: 1px dashed hsl(140 30% 12%); background: none; }
+  .sock.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .target { border-color: var(--primary) !important; border-style: dashed !important; }
+
+  /* ---------- Bottom bar: Roll/Freeze · shop cards · READY ---------- */
+  .shopbar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .5rem; align-items: stretch; height: 6.4rem; }
+  .tools { display: flex; flex-direction: column; gap: .35rem; width: 4.2rem; }
+  .tool { flex: 1; border: 1px solid var(--border); border-radius: 2px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .1rem; font-size: .86rem; letter-spacing: .04em; line-height: 1.1; color: var(--muted); }
+  .tool svg.i { font-size: 1.15rem; color: var(--fg); }
+  .tool .cost { color: var(--accent); font-weight: 700; }
+  .tool .free { color: var(--primary); font-weight: 700; }
+  .tool.on { border-color: var(--r-rare); color: var(--r-rare); } .tool.on svg.i { color: var(--r-rare); }
+  .shop { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); gap: .45rem; }
+  .card { position: relative; min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .2rem; padding: .3rem .25rem;
+    border: 1px solid var(--border); border-top: 3px solid var(--rc, var(--border)); background: var(--secondary); border-radius: 2px; }
+  .card.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); border-top-color: var(--rc, var(--accent)); }
+  .card.frozen::after { content: ""; position: absolute; inset: 0; border: 1px solid var(--r-rare); background: hsl(205 85% 62% / .06); pointer-events: none; }
+  .card.sold { opacity: .12; pointer-events: none; }
+  .card .art { flex: 1; min-height: 0; width: 100%; display: flex; align-items: center; justify-content: center; }
+  .card .art .op { height: 100%; max-height: 3rem; aspect-ratio: 1; }
+  .card .art img { height: 100%; max-height: 2.6rem; max-width: 85%; object-fit: contain; filter: var(--tint); }
+  .card .art.gunart img { max-height: 1.9rem; max-width: 92%; filter: invert(.86); }
+  .card .rtg { font-size: 1.5rem; font-weight: 700; color: var(--rc); line-height: 1; }
+  .card .plate { width: 100%; display: flex; justify-content: center; overflow: hidden; padding: 0 .1rem; }
+  .card .nm { font-size: .9rem; }
+  .price { position: absolute; top: .2rem; left: .3rem; color: var(--accent); font-weight: 700; font-size: .86rem; }
+  .price::before { content: "¢"; }
+  .badge { position: absolute; top: .2rem; right: .25rem; font-size: .86rem; color: var(--bg); background: var(--accent); padding: .1rem .25rem; font-weight: 700; }
+  .ready { width: 7rem; background: var(--primary); color: var(--bg); font-weight: 700; letter-spacing: .2em; border-radius: 2px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .2rem; }
+  .ready b { font-size: 1rem; }
+  .ready small { font-size: .86rem; letter-spacing: 0; opacity: .75; white-space: nowrap; }
+
+  /* ---------- Inspect popover (details live here, not on the board) ---------- */
+  .pop { position: fixed; z-index: 80; width: min(19rem, calc(100vw - 1rem)); background: hsl(220 18% 6%); border: 1px solid var(--accent); border-radius: 2px;
+    padding: .55rem .65rem; box-shadow: 0 .6rem 2rem rgba(0,0,0,.7); display: grid; gap: .3rem; }
+  .pop .h { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+  .pop .h b { color: var(--hi); font-size: 1.05rem; }
+  .pop .tag { font-size: .86rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .pop .ln { font-size: .86rem; color: var(--muted); }
+  .pop .ln b { color: var(--fg); font-weight: 500; }
+  .pop .hint { font-size: .86rem; color: var(--accent); }
+  .pop .acts { display: flex; gap: .4rem; justify-content: flex-end; margin-top: .15rem; }
+  .pop.dock { grid-template-columns: minmax(0, 1fr) auto; align-content: center; gap: .15rem .8rem; padding: .4rem .65rem; }
+  .pop.dock .h, .pop.dock .ln, .pop.dock .hint { grid-column: 1; }
+  .pop.dock .acts { grid-column: 2; grid-row: 1 / 5; align-self: center; margin: 0; }
+  .pop .gst { display: inline-flex; gap: .5rem; margin-left: .35rem; letter-spacing: 0; }
+  .pop .gst span { display: inline-flex; align-items: center; gap: .15rem; } .pop .gst b { color: var(--fg); font-weight: 600; font-size: inherit; }
+  .pop .gst svg { width: .75rem; height: .75rem; fill: none; stroke: currentColor; stroke-width: 1.6; }
+  .pop .ln b.up { color: var(--primary); } .pop .ln .down, .pop .ln b.down { color: var(--danger); }
+  .btn { border: 1px solid var(--border); padding: 0 .7rem; height: 2.2rem; font-size: .86rem; letter-spacing: .12em; text-transform: uppercase; border-radius: 2px; }
+  .btn.buy { border-color: var(--accent); background: var(--accent); color: var(--bg); font-weight: 700; }
+
+  .toast { position: fixed; top: 3.2rem; left: 50%; transform: translateX(-50%); z-index: 95; background: var(--card); border: 1px solid var(--primary); padding: .4rem .85rem; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: calc(100% - 2rem); text-align: center; }
+  .toast.show { opacity: 1; } .toast.bad { border-color: var(--danger); color: hsl(0 70% 75%); }
+
+
+  /* ---------- Declutter + guidance ---------- */
+  .syn.off { border-color: transparent; background: none; color: hsl(140 12% 30%); }
+  .team.focus .tile:not(.hl) { opacity: .25; }
+  .team.focus .tile.hl { box-shadow: 0 0 0 1px var(--primary), 0 0 .8rem hsl(140 70% 55% / .35); }
+  .card.poor { opacity: .4; } .card.poor .price { color: var(--danger); }
+  .card.up { border-color: var(--accent); box-shadow: inset 0 0 1rem hsl(36 90% 55% / .18); }
+  /* an op you already own: a soft light sweeps across now and then */
+  .card.owned::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(105deg, transparent 35%, hsl(140 80% 70% / .16) 50%, transparent 65%) no-repeat;
+    background-size: 250% 100%; animation: shimmer 2.8s ease-in-out infinite; }
+  @keyframes shimmer { 0% { background-position: 130% 0; } 60%, 100% { background-position: -30% 0; } }
+  @media (prefers-reduced-motion: reduce) { .card.owned::before { animation: none; background-position: 50% 0; } }
+  .card .own { position: absolute; top: .2rem; right: .25rem; display: flex; align-items: center; gap: .15rem; color: var(--accent); font-size: .86rem; font-weight: 700; }
+  .card .own .op { width: 1.1rem; height: 1.1rem; }
+
+  /* ---------- Drag and drop ---------- */
+  .tile, .bslot, .sock, .card { touch-action: none; }
+  .ghostdrag { position: fixed; z-index: 85; pointer-events: none; margin: 0; opacity: .92; transform: rotate(-3deg) scale(1.05); box-shadow: 0 .8rem 2rem rgba(0,0,0,.7); }
+  .dragsrc { opacity: .25; }
+  body.dragging, body.dragging * { cursor: grabbing !important; }
+  body.drag-player .zg, body.drag-shopplayer .zg { outline: 1px dashed hsl(140 70% 55% / .5); outline-offset: 1px; }
+  body.drag-player .bslot.empty, body.drag-shopplayer .bslot.empty, body.drag-shopop .sock.empty { border-color: var(--primary); }
+  body.drag-slot .team .tile, body.drag-shopop .team .tile, body.drag-shopitem .team .tile { box-shadow: 0 0 0 1px hsl(140 70% 55% / .6); }
+  body.drag-player .sock, body.drag-player .sock.empty { border-color: hsl(140 70% 55% / .6); }
+  .over { outline: 2px solid var(--accent) !important; outline-offset: 2px !important; background: hsl(36 90% 55% / .08) !important; }
+  .shopbar { position: relative; }
+  .sellzone { position: absolute; inset: 0; z-index: 5; display: none; place-items: center; border: 1px dashed var(--danger); background: hsl(0 60% 10% / .92); color: hsl(0 70% 75%); font-weight: 700; letter-spacing: .2em; }
+  body.drag-player .sellzone, body.drag-slot .sellzone { display: grid; }
+  .sellzone.over { outline: 2px solid var(--danger) !important; background: hsl(0 60% 14% / .95) !important; }
+
+  /* ---------- Juice ---------- */
+  .fly { position: fixed; z-index: 86; pointer-events: none; margin: 0; }
+  .floater { position: fixed; z-index: 87; pointer-events: none; font-weight: 700; color: var(--accent); text-shadow: 0 0 .6rem hsl(36 90% 55% / .7); white-space: nowrap; transform: translate(-50%, 0); animation: floatUp 1.1s ease-out forwards; }
+  .floater.good { color: var(--primary); text-shadow: 0 0 .6rem hsl(140 70% 55% / .7); }
+  @keyframes floatUp { 0% { opacity: 0; transform: translate(-50%, .4rem) scale(.8); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1.15); } 100% { opacity: 0; transform: translate(-50%, -2.2rem) scale(1); } }
+  .lvlup { animation: lvlup 1.1s ease-out; }
+  @keyframes lvlup { 0% { box-shadow: 0 0 0 3px var(--accent), 0 0 2.4rem hsl(36 90% 55% / .9); transform: scale(1.08); } 40% { transform: scale(1); } 100% { box-shadow: 0 0 0 0 transparent; } }
+  .lvlup .pips i.on { animation: pip .6s ease-out; }
+  @keyframes pip { 0% { transform: rotate(45deg) scale(2.2); } 100% { transform: rotate(45deg) scale(1); } }
+  .tick-up { color: var(--primary) !important; } .tick-down { color: var(--danger) !important; }
+
+  @media (max-width: 760px) { .chip.rd small, .mapChip .mods { display: none; } .hud { gap: .7rem; } .dock { gap: .9rem; } }
+
+  .rotate { display: none; position: fixed; inset: 0; place-items: center; text-align: center; padding: 1.5rem; }
+  .rotate .ic { font-size: 3.4rem; color: var(--primary); display: inline-block; animation: tilt 2.4s ease-in-out infinite; }
+  .rotate .t { font-weight: 700; letter-spacing: .25em; margin: 1rem 0 .4rem; color: var(--hi); }
+  .rotate .s { color: var(--muted); font-size: .86rem; }
+  .rotate .btn { margin-top: 1.3rem; height: 2.8rem; border-color: var(--accent); color: var(--accent); }
+  @keyframes tilt { 50% { transform: rotate(90deg); } }
+  @media (orientation: portrait) { .app, .pop { display: none !important; } .rotate { display: grid; } }
+  /* Installed app: already fullscreen, so no fullscreen buttons */
+  @media (display-mode: fullscreen), (display-mode: standalone) { #fsBtn, #rotateFs { display: none !important; } }
+  .elsewhere { position: fixed; inset: 0; z-index: 999; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 94%, transparent); }
+  .elsewhere > div { display: flex; flex-direction: column; align-items: center; gap: .7rem; text-align: center; }
+  .elsewhere .btn { height: 2.6rem; padding: 0 1.2rem; border: 1px solid var(--primary); background: var(--primary); color: var(--bg); font-weight: 700; letter-spacing: .14em; cursor: pointer; }
+  .elsewhere b { color: var(--accent); letter-spacing: .15em; font-size: 1.1rem; } .elsewhere span { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="crt" aria-hidden="true"></div>
+
+<main class="app" id="app">
+  <header class="hud">
+    <span class="chip gold" title="Credits">¢<span id="credits"></span></span>
+    <span class="chip streak" id="streakChip" hidden></span>
+    <span class="chip hp" title="Lives" id="lives"></span>
+    <span class="chip win" title="Wins"><svg class="i" viewBox="0 0 24 24"><path d="M6 2h12v3h4v3a5 5 0 0 1-5 5h-.4A6 6 0 0 1 13 16.9V19h4v3H7v-3h4v-2.1A6 6 0 0 1 7.4 13H7a5 5 0 0 1-5-5V5h4zm0 5H4v1a3 3 0 0 0 2 2.8zm12 0v3.8A3 3 0 0 0 20 8V7z"/></svg><span id="wins"></span><span id="winsOf">/10</span></span>
+    <span class="chip rd"><small>ROUND</small><span id="roundNo"></span></span>
+    <span class="chip mode" id="modeChip"></span>
+    <button class="chip trkChip" id="trkBtn" title="Trinkets" hidden></button>
+    <span class="grow"></span>
+    <button class="chip mapChip" id="mapBtn">BANK<span class="mods" id="mapMods"></span></button>
+    <button class="chip iconBtn" id="menuBtn" title="Menu" aria-label="Menu"><svg class="i" viewBox="0 0 24 24"><path d="M3 5h18v2H3zm0 6h18v2H3zm0 6h18v2H3z"/></svg></button>
+    <button class="chip iconBtn" id="fsBtn" title="Fullscreen" aria-label="Fullscreen"><svg class="i" viewBox="0 0 24 24"><path d="M3 3h7v2H5v5H3zm11 0h7v7h-2V5h-5zM3 14h2v5h5v2H3zm16 0h2v7h-7v-2h5z"/></svg></button>
+  </header>
+
+  <section class="stage">
+    <aside class="rail" id="rail"></aside>
+    <div class="team" id="team"></div>
+  </section>
+
+  <section class="dock" id="dock"></section>
+
+  <footer class="shopbar">
+    <div class="tools">
+      <button class="tool" id="rerollBtn"></button>
+      <button class="tool" id="freezeBtn"><svg class="i" viewBox="0 0 24 24"><path d="M11 2h2v4.2l2.6-2.6 1.4 1.4-4 4V11h2.4l4-4 1.4 1.4-2.6 2.6H22v2h-4.2l2.6 2.6-1.4 1.4-4-4H13v2.4l4 4-1.4 1.4-2.6-2.6V22h-2v-4.2l-2.6 2.6L7 19l4-4V13H8.6l-4 4L3.2 15.6 5.8 13H2v-2h3.8L3.2 8.4 4.6 7l4 4H11V8.6l-4-4L8.4 3.2 11 5.8z"/></svg>FREEZE</button>
+    </div>
+    <div class="shop" id="shop"></div>
+    <button class="ready" id="readyBtn"><b>READY</b><small id="nextOpp"></small></button>
+    <div class="sellzone" id="sellZone"></div>
+  </footer>
+</main>
+
+<div class="pop" id="pop" hidden></div>
+
+<div class="rotate" role="dialog" aria-label="Rotate device">
+  <div>
+    <div class="ic">▯</div>
+    <div class="t">ROTATE YOUR DEVICE</div>
+    <div class="s">R6 Autobattler plays in landscape</div>
+    <button class="btn" id="rotateFs">Go fullscreen</button>
+  </div>
+</div>
+
+<div class="drop" id="drop" hidden></div>
+<div class="toast" id="toast"></div>
+
+<script src="rarity.js"></script>
+<script src="profile.js"></script>
+<script src="pool.js"></script>
+<script>
+// One run per account (the browser stands in for the account until there are logins).
+// The page opened last owns the run; any other open page locks so two pages can't overwrite each other.
+const PAGE_ID = Math.random().toString(36).slice(2);
+let NOT_OWNER = false;
+try { localStorage.setItem('battler.owner', PAGE_ID); } catch {}
+addEventListener('storage', e => {
+  if (e.key !== 'battler.owner' || e.newValue === PAGE_ID || NOT_OWNER) return;
+  NOT_OWNER = true;
+  if (typeof setPaused === 'function') setPaused(true);   // battle: freeze the fight
+  const d = document.createElement('div');
+  d.className = 'elsewhere';
+  d.innerHTML = '<div><b>RUN OPEN ELSEWHERE</b><span>Your run is open in another tab or window.</span><button class="btn go">PLAY HERE</button></div>';
+  d.querySelector('button').onclick = () => location.reload();
+  document.body.appendChild(d);
+});
+
+/* ---------- Data (player-seasons from data/R6 Stats - Sheet1.csv) ---------- */
+const SVG = {}; // inlined so the two-tone badge (dark plate + currentColor emblem) survives
+const GADGET = f => `items/${f}`;
+const REROLL_ICON = '<svg class="i" viewBox="0 0 24 24"><path d="M12 4a8 8 0 0 1 7.4 5H22l-3.5 4L15 9h2.2A6 6 0 0 0 6 12H4a8 8 0 0 1 8-8zm-6.5 7L9 15H6.8A6 6 0 0 0 18 12h2a8 8 0 0 1-15.4 3H2z"/></svg>';
+const SILHOUETTE = '<svg class="sil" viewBox="0 0 24 24"><path d="M12 2.5c3 0 5.2 2 5.2 5v1.3c0 2.9-2.3 5.2-5.2 5.2s-5.2-2.3-5.2-5.2V7.5c0-3 2.2-5 5.2-5zM4 21.5c.4-3.8 3.6-6.3 8-6.3s7.6 2.5 8 6.3z"/></svg>';
+
+const OPS = {
+  ash:['Ash','Entry'], thermite:['Thermite','Entry'], hibana:['Hibana','Entry'], ace:['Ace','Entry'], blackbeard:['Blackbeard','Entry'],
+  buck:['Buck','Flank'], dokkaebi:['Dokkaebi','Flank'], deimos:['Deimos','Flank'], nomad:['Nomad','Flank'],
+  thatcher:['Thatcher','Support'], twitch:['Twitch','Support'], grim:['Grim','Support'],
+  mute:['Mute','Anchor'], smoke:['Smoke','Anchor'], azami:['Azami','Anchor'], jager:['Jäger','Anchor'], warden:['Warden','Anchor'], kaid:['Kaid','Anchor'],
+  goyo:['Goyo','Anchor'], vigil:['Vigil','Roam'], lesion:['Lesion','Roam'], caveira:['Caveira','Roam'], solis:['Solis','Roam'], ela:['Ela','Roam'],
+};
+const ZONES = [
+  { id:'Entry',   info:'Pushes into their Anchor.' },
+  { id:'Anchor',  info:'Holds against their Entry.' },
+  { id:'Flank',   info:'Fights their Roam for picks.' },
+  { id:'Roam',    info:'Hunts their Flank.' },
+  { id:'Support', info:'Backs up one lane.' },
+];
+const EMPTY_WARN = { Entry:'No pressure on their Anchor', Anchor:'Their Entry walks in', Flank:'Their Roam is free', Roam:'Their Flank walks in', Support:'No lane boost' };
+const MAP_MODS = { Anchor:+10, Flank:-5 };
+const PASSIVES = {
+  'Clutch Gene': ['CG', 'Stronger when last alive.'],
+  'Opener':      ['OP', 'Wins the opening duel more often.'],
+  'Headhunter':  ['HS', 'More one-shot kills.'],
+  'Survivor':    ['SV', 'Harder to kill late in the round.'],
+  'Closer':      ['CL', 'Wins site-fight ties.'],
+  'Winner':      ['WN', 'Small team boost.'],
+};
+
+// Role passives: one per player from a shared pool per role, picked from their real stats. Same table as the battle.
+const ROLE_MULT = { common: 1, rare: 1.33, epic: 1.67, legendary: 2 };
+const pct = v => Math.round(v * 100) + '%';
+const ROLE_PASSIVES = {
+  aim:       { role: 'IGL',     name: 'Aim Discipline', team: true, v: 0.013,  info: v => `Team +${pct(v)} hit chance.` },
+  reload:    { role: 'IGL',     name: 'Reload Drills',  team: true, v: 0.3,  info: v => `Team reloads ${pct(v)} faster.` },
+  tempo:     { role: 'IGL',     name: 'Tempo',          team: true, v: .04,  ramp: true, info: v => `Team +${pct(v)} RPM per team kill.` },
+  lurker:    { role: 'Roam',    name: 'Lurker',         v: 0.12,  ramp: true, info: v => `+${pct(v)} damage per second in a fight (max 5s).` },
+  hunter:    { role: 'Roam',    name: 'Hunter',         v: 0.2,   ramp: true, info: v => `+${pct(v)} damage per team kill.` },
+  ghost:     { role: 'Roam',    name: 'Ghost',          v: 0.08,  info: v => `${pct(v)} of shots at them miss.` },
+  first:     { role: 'Entry',   name: 'First Contact',  v: 0.15,  info: v => `+${pct(v)} RPM for the first 2s.` },
+  flash:     { role: 'Entry',   name: 'Flash Hands',    v: 0.1,  info: v => `Their first target misses ${pct(v)} more for 2s.` },
+  space:     { role: 'Entry',   name: 'Space Maker',    v: 0.08,  info: v => `When they die, team +${pct(v)} hit on their killer.` },
+  hold:      { role: 'Anchor',  name: 'Hold',           v: 6,    info: v => `+${Math.round(v)} armor until first hit.` },
+  digin:     { role: 'Anchor',  name: 'Dig In',         v: 1.5,   ramp: true, info: v => `+${v.toFixed(1)} armor per second in a fight (max 8s).` },
+  lastline:  { role: 'Anchor',  name: 'Last Line',      v: .1,   info: v => `+${pct(v)} damage while 3+ teammates are alive.` },
+  medic:     { role: 'Support', name: 'Medic',          team: true, v: .3,  info: v => `Team heals +${pct(v)}.` },
+  quarter:   { role: 'Support', name: 'Quartermaster',  team: true, v: 1,   info: v => `Team gadgets get +${Math.floor(v)} charge${Math.floor(v) > 1 ? 's' : ''}.` },
+  ammo:      { role: 'Support', name: 'Ammo Runner',    team: true, v: 0.3, info: v => `Team magazines +${pct(v)}.` },
+  crossfire: { role: 'Flank',   name: 'Crossfire',      v: 0.2,  info: v => `+${pct(v)} hit on enemies fighting someone else.` },
+  pincer:    { role: 'Flank',   name: 'Pincer',         v: 0.18,  info: v => `+${pct(v)} damage while your Roam is alive.` },
+  pressure:  { role: 'Flank',   name: 'Pressure',       v: .05,  ramp: true, info: v => `+${pct(v)} damage per burst fired (max 8).` },
+  fill:      { role: 'Flex',    name: 'Fill',           v: .75,  info: v => `Copies a missing role's passive at ${pct(v)}.` },
+  glue:      { role: 'Flex',    name: 'Glue',           team: true, v: 4,   info: v => `Team +${Math.round(v)} HP.` },
+  adapt:     { role: 'Flex',    name: 'Adaptable',      v: .03,  info: v => `+${pct(v)} hit and +${pct(v)} damage.` },
+};
+// Recurring scaling (kept all run, grows between battles):
+//  Mastery: every battle a player plays makes their role passive stronger.
+//  Duos: two roles fighting together build stacks every battle they both play; stacks stay if the pair splits up.
+const MASTERY = { per: .08, cap: 10 };
+const DUOS = [
+  { id: 'call',  a: 'IGL',    b: 'Entry',   to: ['Entry'],         short: 'CP', name: 'Called Push',  per: .03,  cap: 8, info: v => `Entry +${pct(v)} damage.` },
+  { id: 'trade', a: 'Entry',  b: 'Support', to: ['Entry'],         short: 'TK', name: 'Trade Kit',    per: 8,    cap: 8, info: v => `Entry +${Math.round(v)} HP.` },
+  { id: 'fort',  a: 'Anchor', b: 'Support', to: ['Anchor'],        short: 'FT', name: 'Fortified',    per: 1,    cap: 8, info: v => `Anchor +${Math.round(v)} armor.` },
+  { id: 'hunt',  a: 'Flank',  b: 'Roam',    to: ['Flank', 'Roam'], short: 'HP', name: 'Hunting Pair', per: .015, cap: 8, info: v => `Flank and Roam +${pct(v)} hit chance.` },
+];
+// Trinkets: team-wide and permanent. Every 3rd round you pick 1 of 3; later picks come from better tiers.
+// Stat keys (battle): hit, mag, hp, armor, rpm, dmg, rp (role passive strength), heal (team heals per team kill), banner (dmg per win).
+// Run keys (prep): income (¢ per round), mastery (extra per battle), duo (stacks added to every duo when picked).
+const TRINKETS = [
+  { id: 'comms',   tier: 1, short: 'COMMS',  name: 'Comms Headset', hit: .03,          desc: 'Team +3% hit chance.' },
+  { id: 'spare',   tier: 1, short: 'AMMO',   name: 'Spare Mags',    mag: .5,           desc: 'Team +50% mag size.' },
+  { id: 'pouch',   tier: 1, short: 'POUCH',  name: 'Med Pouch',     hp: 8,             desc: 'Team +8 HP.' },
+  { id: 'range',   tier: 1, short: 'RANGE',  name: 'Range Time',    dmg: .05,          desc: 'Team +5% damage.' },
+  { id: 'piggy',   tier: 1, short: 'PIGGY',  name: 'Piggy Bank',    income: 1,         desc: '+¢1 per round.' },
+  { id: 'supply',  tier: 2, short: 'ARMOR',  name: 'Armor Supply',  armor: 4,          desc: 'Team +4 armor.' },
+  { id: 'surgeon', tier: 2, short: 'MEDIC',  name: 'Field Surgeon', heal: 20,          desc: 'Each team kill heals everyone 20 HP.' },
+  { id: 'drill',   tier: 2, short: 'DRILL',  name: 'Drill Sergeant', mastery: 1,       desc: '2 mastery per battle instead of 1.' },
+  { id: 'chest',   tier: 2, short: 'CHEST',  name: 'War Chest',     income: 3,         desc: '+¢3 per round.' },
+  { id: 'chem',    tier: 2, short: 'CHEM',   name: 'Team Chemistry', duo: 3,           desc: '+3 stacks to every duo.' },
+  { id: 'invest',  tier: 2, short: 'INVEST', name: 'Org Investment', invest: 2,      desc: '+¢2 per round, +¢2 more each round (max ¢10).' },
+  { id: 'banner',  tier: 3, short: 'BANNER', name: 'Team Banner',   banner: .02,       desc: 'Team +2% damage per win.' },
+  { id: 'over',    tier: 3, short: 'OVERCLK', name: 'Overclock',    rpm: .12,          desc: 'Team +12% RPM.' },
+  { id: 'crates',  tier: 3, short: 'CRATES', name: 'Kevlar Crates', hp: 20,            desc: 'Team +20 HP.' },
+  { id: 'head',    tier: 3, short: 'HEADCO', name: 'Head Coach',    rp: .6,            desc: 'Role passives 60% stronger.' },
+  { id: 'scopes',  tier: 3, short: 'SCOPES', name: 'Tac Scopes',    hit: .06,          desc: 'Team +6% hit chance.' },
+  { id: 'cracked', tier: 4, short: 'CRACKED', name: 'Cracked',      dmg: .25,          desc: 'Team +25% damage.' },
+  { id: 'jugg',    tier: 4, short: 'JUGG',   name: 'Juggernaut Kit', armor: 4, hp: 20, desc: 'Team +4 armor, +20 HP.' },
+  { id: 'golden',  tier: 4, short: 'GOLDEN', name: 'Golden Hands',  rpm: .2, mag: .5,  desc: 'Team +20% RPM, +50% mag size.' },
+  { id: 'dynasty', tier: 4, short: 'DYNASTY', name: 'Dynasty',      banner: .03, income: 3, desc: 'Team +3% damage per win. +¢3 per round.' },
+  { id: 'legend',  tier: 4, short: 'LEGEND', name: 'Legend Status', rp: 1.2,           desc: 'Role passives 120% stronger.' },
+];
+const TRK_EVERY = 3;
+const trkTier = round => Math.min(4, Math.floor(round / TRK_EVERY));
+const trkSum = (ids, k) => ids.reduce((a, id) => a + (TRINKETS.find(t => t.id === id)?.[k] || 0), 0);
+const TIER_COLOR = ['', 'var(--r-common)', 'var(--r-rare)', 'var(--r-epic)', 'var(--r-legendary)'];
+const mastMul = m => 1 + MASTERY.per * Math.min(MASTERY.cap, m || 0);
+// Each Flex on the team stands in for one missing duo role (in duo order), so Flex-heavy teams can still build duos.
+const DUO_ROLES = [...new Set(DUOS.flatMap(d => [d.a, d.b]))];
+function flexSubs(team) {
+  const need = DUO_ROLES.filter(r => !team.some(p => p.role === r)), m = new Map();
+  team.filter(p => p.role === 'Flex').forEach((p, i) => need[i] && m.set(p, need[i]));
+  return m;
+}
+// Who gets this duo's bonus, or null when the team can't field both roles
+function duoCast(d, team) {
+  const subs = flexSubs(team), roleOf = p => subs.get(p) || p.role;
+  if (![d.a, d.b].every(r => team.some(p => roleOf(p) === r))) return null;
+  return team.filter(p => d.to.includes(roleOf(p)));
+}
+const ROLE_ZONE = { Entry: 'Entry', Anchor: 'Anchor', Flank: 'Flank', Roam: 'Roam' };
+const ROLE_LIST = ['IGL', 'Entry', 'Anchor', 'Flank', 'Roam', 'Support', 'Flex'];
+function pickRole(roles, st) {
+  const role = roles.includes('IGL') ? 'IGL' : roles.find(r => ROLE_LIST.includes(r)) || 'Flex';
+  const { hs, ent, srv, clutch, wr, kd, rating } = st;
+  const rp = {
+    IGL:     hs >= 55 ? 'aim' : ent >= 0 ? 'tempo' : 'reload',
+    Roam:    srv >= 36 ? 'ghost' : kd >= 1.1 ? 'hunter' : 'lurker',
+    Entry:   ent >= 15 ? 'first' : hs >= 55 ? 'flash' : 'space',
+    Anchor:  srv >= 36 ? 'hold' : clutch >= 8 ? 'lastline' : 'digin',
+    Support: srv >= 36 ? 'medic' : wr >= .6 ? 'quarter' : 'ammo',
+    Flank:   hs >= 55 ? 'crossfire' : ent >= 0 ? 'pincer' : 'pressure',
+    Flex:    rating >= 1.1 ? 'fill' : wr >= .6 ? 'glue' : 'adapt',
+  }[role];
+  return { role, rp };
+}
+// Short versions for the popovers: passive name + effect, gun name + damage + RPM
+const rpShort = (p, zone) => {
+  const P = ROLE_PASSIVES[p.rp], z = ROLE_ZONE[P.role], half = z && zone && zone !== 'bench' && zone !== z;
+  const v = P.v * (ROLE_MULT[p.rarity] || 1) * mastMul(p.mastery) * (half ? .5 : 1);
+  return `<b>${P.name}</b> ${P.info(v)}${half ? ` <span class="warn">Half outside ${z}.</span>` : ''}`;
+};
+// Same icons as the battle cards: bullet = damage per bullet, cycle = RPM
+const ICO = {
+  dmg: '<svg viewBox="0 0 12 12"><path d="M3 10.5V5.5Q3 1.5 6 1q3 .5 3 4.5v5z"/></svg>',
+  rpm: '<svg viewBox="0 0 12 12"><path d="M10.5 6A4.5 4.5 0 1 1 6 1.5M6 1.5h3.5M9.5 1.5v3"/></svg>',
+  hp:  '<svg viewBox="0 0 12 12"><path d="M6 10.5 1.6 6.2A2.6 2.6 0 0 1 6 2.6a2.6 2.6 0 0 1 4.4 3.6z"/></svg>',
+  arm: '<svg viewBox="0 0 12 12"><path d="M6 1 10.5 2.6V6c0 2.6-2 4.3-4.5 5C3.5 10.3 1.5 8.6 1.5 6V2.6z"/></svg>',
+  mag: '<svg viewBox="0 0 12 12"><path d="M3.5 1h5v4l1 6h-5l-1-6z"/></svg>',
+};
+// In-game gun numbers, same formula as battle.html statsFor (before gear and items):
+// automatics have RPM evened out toward the same DPS; pump/bolt guns keep their slow rate and hit harder instead.
+const TUNE = { ref: 24000, pull: .75 }, PUMP_RPM = { SG: 70, DMR: 60 };
+const normRpm = (d, rof) => rof * (TUNE.ref / (rof * Math.max(1, d - 2))) ** TUNE.pull;
+function gameGun(n, lvl = 1) {
+  const [t, d, r0] = WEAPONS[n], rof = r0 || PUMP_RPM[t] || 60, n2 = normRpm(d, rof);
+  return { dmg: Math.round(d * (r0 ? 1 : n2 / rof) * (1 + .1 * (lvl - 1))), rpm: Math.round(r0 ? n2 : rof) };
+}
+// ---- Copied from battle.html so the card stats match the battle (regenerate if those tables change) ----
+const ARMOR = { 1: { hp: 100, block: 0, react: -60, dodge: .28 }, 2: { hp: 110, block: 2, react: 0, dodge: 0 }, 3: { hp: 125, block: 5, react: 60, dodge: 0 } };
+const OP_ARMOR = {ash:1, thermite:2, hibana:1, ace:2, blackbeard:2, buck:2, dokkaebi:2, mute:2, smoke:2, thatcher:2, lesion:2, vigil:2, jager:2, twitch:2, grim:2, nomad:2, deimos:2, azami:2, warden:2, goyo:2, kaid:3, caveira:1, solis:2, ela:1};
+const B_ITEMS = {
+  Frag:            { throw: 'frag',   at: 480, label: 'FRAG',          boom: 35, chance: .65, info: 'May hit their lane player for 35. Blocked by ADS.' },
+  'Breach Charge': { throw: 'breach', at: 560, label: 'BREACH CHARGE', site: .5, info: '+50% damage vs their Anchor. Blocked by Mute.' },
+  Stun:            { throw: 'flash',  at: 'contact', label: 'FLASH',    blind: 2000, info: 'Their lane player misses more for 2s. Blocked by ADS and Warden.' },
+  Smoke:           { throw: 'smoke',  at: 'contact', label: 'SMOKE',    smoke: 3000, info: 'Enemies miss more into this lane for 3s. Blocked by ADS and Warden.' },
+  'Stim Pack':     { label: 'STIM',     hp: 35,      info: '+35 HP.' },
+  // Consumables: simple stat changes for one battle
+  'Hot Loads':     { label: 'HOT LOADS',    dmgMul: 1.25,               info: '+25% damage.' },
+  'Heavy Rounds':  { label: 'HEAVY ROUNDS', dmgMul: 1.75, rpmMul: .7,   info: '+75% damage, -30% RPM.' },
+  'Hair Trigger':  { label: 'HAIR TRIGGER', dmgMul: .9, rpmMul: 1.45,   info: '+45% RPM, -10% damage.' },
+  'Extra Mags':    { label: 'EXTRA MAGS',   magMul: 2, reloadMul: .5,   info: '2x mag size, 50% faster reloads.' },
+  'Trauma Plate':  { label: 'TRAUMA PLATE', armor: 7,                   info: '+7 armor.' },
+  'Steady Aim':    { label: 'STEADY AIM',   hit: .1,                    info: '+10% hit chance.' },
+  'Prize Money':   { label: 'PRIZE MONEY', info: '+¢4 if they get the most kills on your team.' },
+  Painkillers:     { label: 'PAINKILLERS',  dr: .18,                    info: '-18% damage taken.' },
+  Adrenaline:      { label: 'ADRENALINE', adren: .4, info: '+40% RPM for the first 3s.' },
+  'AP Rounds':     { label: 'AP ROUNDS', pierce: 1,  info: 'Bullets ignore armor.' },
+  Incendiary:      { label: 'INCENDIARY', burn: .03, info: 'Hits burn 3% max HP per second for 2s.' },
+  Claymore:        { throw: 'clay',   at: 'contact', label: 'CLAYMORE', boom: 35, chance: .65, info: 'May hit the first pusher for 35. Blocked by Grim.' },
+};
+const B_GEAR = {
+  kevlar:   { name: 'Kevlar Vest',   info: '+32 HP. From the 3rd vest, also -5% RPM.' },
+  plate:    { name: 'Ceramic Plate', info: '+10 armor (blocks 10 damage per bullet). -15% fire damage. -2.5% RPM.' },
+  hollow:   { name: 'Hollow Points', info: '+40% damage. Armor blocks double.' },
+  momentum: { name: 'Momentum',      info: '+15% damage per kill.' },
+  blood:    { name: 'Bloodthirst',   info: 'Heal 30 HP per kill.' },
+  fresh:    { name: 'Fresh Mag',     info: '+20% damage on the first half of each mag.' },
+  wind:     { name: 'Second Wind',   info: 'Below 50% HP: heal 35 and +40% RPM. Once per fight.' },
+  revenge:  { name: 'Revenge',       info: '+35% damage for 3s when a teammate dies.' },
+  spons:    { name: 'Sponsorship',   info: 'Earns credits. No combat effect.' },
+  thick:    { name: 'Thick Skin',    info: 'Takes 10% less damage, plus 4% less per hit taken (max 60%). Half as strong vs Shred.' },
+  shred:    { name: 'Shred Rounds',  info: "Hits also deal 8% of the target's max HP. Halves Thick Skin. One per player." },
+  cond:     { name: 'Conditioning',  base: 12, scale: 8,  info: '+12 HP. +8 more each battle.' },
+  vet:      { name: 'Veteran',       base: 2,  scale: .75, info: '+2 damage. +3 more every 4 kills.' },
+  iron:     { name: 'Iron Wall',     base: 1,  scale: .75, info: '+1 armor. +3 more every 4 battles survived.' },
+};
+
+// A player's starting numbers in battle: gear, attachments, this battle's item, op level and trinkets.
+// Not included: role passives, duos and auras (they depend on the fight).
+function cardStats(p) {
+  const gun = gunOf(p); if (!gun) return null;
+  const [cls, d, r0, mag] = WEAPONS[gun], rof = r0 || PUMP_RPM[cls] || 60, n2 = normRpm(d, rof);
+  const A = ARMOR[OP_ARMOR[p.op] || 2], it = (p.buff && B_ITEMS[p.buff.name]) || {}, gear = p.gear || [];
+  const g = id => gear.filter(x => x.id === id).length, gn = id => gear.filter(x => x.id === id).reduce((a, x) => a + (x.n || 0), 0);
+  const T = k => trkSum(S.trinkets || [], k), lvl = p.op ? p.lvl || 1 : 1, att = p.att || [];
+  const hp = A.hp + (p.passives.includes('Survivor') ? 15 : 0) + 32 * g('kevlar') + B_GEAR.cond.base * g('cond') + Math.floor(B_GEAR.cond.scale * gn('cond')) + (it.hp || 0) + T('hp');
+  const armor = A.block + 10 * g('plate') + B_GEAR.iron.base * g('iron') + Math.floor(B_GEAR.iron.scale * gn('iron')) + (it.armor || 0) + T('armor');
+  const dmg0 = Math.round(d * (r0 ? 1 : n2 / rof) * (1 + .1 * (lvl - 1)) * (1 + .4 * g('hollow')) * (it.dmgMul || 1)) + B_GEAR.vet.base * g('vet') + Math.floor(B_GEAR.vet.scale * gn('vet'));
+  const rpm0 = Math.round((r0 ? n2 : rof) * .95 ** Math.max(0, g('kevlar') - 2) * .975 ** g('plate') * (it.rpmMul || 1));
+  const mag0 = Math.round(mag * (att.includes('ext') ? 1.5 : 1) * (it.magMul || 1));
+  return { hp, armor, dmg: Math.round(dmg0 * (1 + T('dmg') + T('banner') * (S.wins || 0))), rpm: Math.round(rpm0 * (1 + T('rpm'))), mag: Math.round(mag0 * (1 + T('mag'))) };
+}
+const gunStats = (n, lvl) => { const g = gameGun(n, lvl);
+  return `<span class="gst"><span title="Damage per bullet">${ICO.dmg}<b>${g.dmg}</b></span><span title="Rounds per minute">${ICO.rpm}<b>${g.rpm}</b></span></span>`; };
+const rpLine = (p, zone) => {
+  const P = ROLE_PASSIVES[p.rp], z = ROLE_ZONE[P.role], half = z && zone && zone !== 'bench' && zone !== z;
+  const v = P.v * (ROLE_MULT[p.rarity] || 1) * mastMul(p.mastery) * (half ? .5 : 1);
+  return `<b>${P.name}</b> <span class="mut">${p.role}${P.ramp ? ' · builds up' : ''}</span> · ${P.info(v)}${half ? ` <span class="warn">(half outside ${z})</span>` : ''} · <span class="mut">mastery</span> <b>${p.mastery || 0}</b>/${MASTERY.cap}`;
+};
+// Rarity belongs to the player, not the season: one career score from every season (role-weighted stats, sample size,
+// career length). See build_rarity.py. Falls back to rating only for a player missing from the data.
+const RAR = { c: 'common', r: 'rare', e: 'epic', l: 'legendary' };
+// exact name first, then without trailing digits (rosters say "soulz1", stats say "soulz")
+const impactOf = name => { const R = window.RARITY || {}, n = name.toLowerCase(); return R[n] || R[n.replace(/\d+$/, '')]; };
+const rarityOf = (r, name, year) => { const x = impactOf(name); return x ? RAR[x[0]] : r >= 1.17 ? 'legendary' : r >= 1.10 ? 'epic' : r >= 1.02 ? 'rare' : 'common'; };
+const COST = { common:2, rare:3, epic:5, legendary:7 };
+
+function P(name, year, rating, kd, entry, srv, clutch, plants, hs, atk, def, roles, wr) {
+  const passives = [];
+  const ent = parseInt(entry.match(/\(([+-]\d+)\)/)[1], 10);
+  if (clutch >= 10) passives.push('Clutch Gene');
+  if (ent >= 20) passives.push('Opener');
+  if (hs >= 58) passives.push('Headhunter');
+  if (srv >= 36) passives.push('Survivor');
+  if (plants >= 25) passives.push('Closer');
+  if (wr >= .68) passives.push('Winner');
+  const [k, d] = kd.split('-').map(Number);
+  const { role, rp } = pickRole(roles, { hs, ent, srv, clutch, wr, kd: k / Math.max(1, d), rating });
+  return { id: name + year, name, year, rating, kd, entry, srv, clutch, hs, mains:[atk, def], roles, wr, role, rp,
+           rarity: rarityOf(rating, name, year), passives: passives.slice(0, 2), mastery: 0, op: null, zone: null, buff: null, weapon: null, att: [], gear: [] };
+}
+
+const POOL_FALLBACK = [
+  P('Nina',2024,1.23,'389-263','62-36 (+26)',36,6,3,56,'dokkaebi','warden',['Entry'],.565),
+  P('Levy',2025,1.01,'354-346','66-54 (+12)',29,2,3,60,'grim','warden',['Flex'],.40),
+  P('Reeps96',2024,1.19,'569-423','115-81 (+34)',33,16,5,51,'buck','mute',['Flex'],.696),
+  P('Gotti',2024,1.17,'153-118','22-9 (+13)',47,6,26,54,'ace','mute',['Support'],.65),
+  P('Woogiman',2025,1.01,'301-290','41-47 (-6)',35,13,14,52,'blackbeard','smoke',['Flex','IGL'],.646),
+  P('Jigsaw',2025,1.15,'244-200','58-23 (+35)',25,2,0,59,'nomad','azami',['Entry'],.636),
+  P('Slater',2025,1.18,'160-125','22-10 (+12)',29,0,3,52,'deimos','smoke',['Flex'],.667),
+  P('Mephi',2025,1.01,'398-375','49-55 (-6)',33,11,9,41,'ash','smoke',['Flex'],.543),
+  P('yass',2024,1.14,'266-202','34-26 (+8)',41,5,4,57,'ash','lesion',['Flex'],.646),
+];
+// Shop players: every Tier 1 pro from pool.js (build_pool.py); the short list above is only a fallback
+const POOL = (window.POOL_DATA || []).length ? window.POOL_DATA.map(a => P(...a)) : POOL_FALLBACK;
+// Guns: every primary in R6 Manager's data [type, damage, RPM (0 = pump/bolt), magazine]. Any gun on anyone; it replaces their op's gun and is kept.
+const WEAPONS = {"L85A2":["AR",47,670,31],"AR33":["AR",40,749,26],"G36C":["AR",38,780,31],"R4-C":["AR",39,860,31],"556XI":["AR",43,690,31],"F2":["AR",37,980,26],"AK-12":["AR",45,850,31],"AUG A2":["AR",38,750,31],"552 Commando":["AR",43,690,26],"416-C Carbine":["AR",38,740,26],"C8-SFW":["AR",40,837,31],"Mk17 CQB":["AR",48,585,21],"PARA-308":["AR",48,650,31],"TYPE-89":["AR",40,850,21],"C7E":["AR",46,800,31],"M762":["AR",45,730,26],"V308":["AR",44,700,51],"Spear .308":["AR",42,700,31],"M4":["AR",44,750,31],"AK-74M":["AR",44,650,31],"ARX200":["AR",47,700,21],"F90":["AR",38,780,31],"Commando 9":["AR",36,780,26],"SC3000K":["AR",45,860,26],"POF-9":["AR",35,740,51],"PCX-33":["AR",36,800,31],"FMG-9":["SMG",34,800,26],"MP5K":["SMG",30,800,21],"UMP45":["SMG",38,600,26],"MP5":["SMG",27,800,31],"P90":["SMG",22,970,51],"9x19VSN":["SMG",34,750,31],"MP7":["SMG",32,900,31],"9mm C1":["SMG",45,575,34],"MPX":["SMG",26,830,31],"M12":["SMG",36,550,31],"MP5SD":["SMG",27,800,31],"PDW9":["SMG",34,800,51],"Vector .45 ACP":["SMG",21,1200,26],"T-5 SMG":["SMG",28,900,31],"Scorpion EVO 3 A1":["SMG",23,1080,41],"K1A":["SMG",36,720,31],"Mx4 Storm":["SMG",26,950,26],"AUG A3":["SMG",33,760,31],"UZK50Gi":["SMG",44,700,21],"6P41":["LMG",46,680,101],"G8A1":["LMG",37,850,51],"M249":["LMG",48,650,61],"T-95 LSW":["LMG",43,650,81],"LMG-E":["LMG",44,730,151],"ALDA 5.56":["LMG",35,900,81],"M249 SAW":["LMG",48,650,61],"DP27":["LMG",49,550,71],"417":["DMR",69,450,21],"OTs-03":["DMR",72,200,11],"CAMRS":["DMR",69,450,21],"SR-25":["DMR",72,260,21],"Mk 14 EBR":["DMR",60,450,21],"AR-15.50":["DMR",72,450,11],"CSRX 300":["DMR",122,0,6],"PMR90A2":["DMR",47,260,11],"M590A1":["SG",48,0,7],"M1014":["SG",34,0,9],"SG-CQB":["SG",53,0,7],"SASG-12":["SG",50,180,9],"M870":["SG",60,0,8],"Super 90":["SG",35,300,9],"SPAS-12":["SG",50,0,7],"SPAS-15":["SG",30,300,7],"SuperNova":["SG",55,0,7],"ITA12L":["SG",50,0,9],"SIX12":["SG",35,200,6],"SIX12 SD":["SG",35,200,6],"FO-12":["SG",25,400,9],"BOSG.12.2":["SG",125,0,2],"ACS12":["SG",69,300,9],"TCSG12":["SG",57,0,6],"SMG-11":["MP",35,1270,17],"Bearing 9":["MP",33,1100,26],"C75 Auto":["MP",35,1000,20],"SMG-12":["MP",25,1270,34],"SPSMG9":["MP",35,1000,16],"Reaper MK2":["MP",33,900,35]};
+const GUN_FILE = {".44 Mag Semi-Auto":[".44_Mag_Semi-Auto",128,74],".44 Vendetta":["44VENDETTA",141,93],"1911 TACOPS":["1911_TACOPS",98,68],"416-C Carbine":["416-C_Carbine",192,73],"417":["417",240,70],"5.7 USG":["5.7_USG",103,74],"552 Commando":["552_Commando",244,78],"556XI":["556xi",240,72],"6P41":["6P41",273,76],"9mm C1":["9mm_C1",278,67],"9x19VSN":["9x19VSN",174,76],"ACS12":["ACS12_PB",210,76],"AK-12":["AK-12",246,74],"AK-74M":["AK-74M",202,74],"ALDA 5.56":["ALDA_5.56",272,66],"AR-15.50":["AR-15.50",226,74],"AR33":["AR33",266,74],"ARX200":["ARX200",250,72],"AUG A2":["AUG_A2",197,72],"AUG A3":["AUG_A3",194,73],"BOSG.12.2":["BOSG.12.2",273,62],"Bailiff 410":["Bailiff_410",92,73],"Bearing 9":["Bearing_9",153,90],"C75 Auto":["C75_Auto",86,75],"C7E":["C7E",244,71],"C8-SFW":["C8-SFW",207,75],"CAMRS":["CAMRS",278,61],"CSRX 300":["CSRX_300",217,52],"Commando 9":["Commando_9",184,74],"D-50":["D-50",132,76],"DP27":["Primary_gun_DP27",290,52],"F2":["F2",190,72],"F90":["F2000",214,94],"FMG-9":["FMG-9",152,73],"FO-12":["FO-12",138,76],"G36C":["G36C",171,74],"G8A1":["G8A1",270,64],"GSh-18":["GSh-18",99,78],"ITA12L":["ITA12L",280,64],"ITA12S":["ITA12S",186,75],"K1A":["K1A",202,73],"Keratos .357":["Keratos_.357",119,76],"L85A2":["L85A2",218,74],"LFP586":["LFP586",144,78],"LMG-E":["LMG-E",158,70],"Luison":["Luison",178,74],"M1014":["M1014",280,59],"M12":["M12",199,74],"M249":["M249",262,71],"M249 SAW":["M249_SAW",272,74],"M4":["M4",234,72],"M45 MEUSOC":["M45_MEUSOC",108,74],"M590A1":["M590A1",280,58],"M762":["M762",236,72],"M870":["M870",264,71],"MP5":["MP5",186,74],"MP5K":["MP5K",196,92],"MP5SD":["MP5SD",204,77],"MP7":["MP7",151,71],"MPX":["MPX",148,74],"Mk 14 EBR":["Mk_14_EBR",264,58],"Mk1 9mm":["Mk1_9mm_BI",110,77],"Mk17 CQB":["Mk17_CQB",218,74],"Mx4 Storm":["Mx4_Storm",185,74],"OTs-03":["OTs-03",268,66],"P-10C":["P-10C",90,76],"P12":["P12",111,77],"P226 Mk 25":["P226_Mk_25",95,73],"P229":["P229",107,78],"P9":["P9",99,76],"P90":["P90",182,74],"PARA-308":["PARA-308",244,76],"PCX-33":["pcx-33",234,67],"PDW9":["PDW9",134,76],"PMM":["PMM",96,76],"PMR90A2":["PMR90A2",268,56],"POF-9":["POF9",258,84],"PRB92":["PRB92",114,78],"Q-929":["Q-929",111,76],"R4-C":["R4-C",214,75],"RG15":["RG15",86,77],"Reaper MK2":["reaper-mk2",90,100],"SASG-12":["SASG-12",224,68],"SC3000K":["F2000",214,94],"SDP 9mm":["SDP_9mm",117,94],"SG-CQB":["SG-CQB",280,63],"SIX12":["SIX12",218,74],"SIX12 SD":["SIX12_SD",224,74],"SMG-11":["SMG-11",142,76],"SMG-12":["SMG-12",152,74],"SPAS-12":["SPAS-12",280,56],"SPAS-15":["SPAS-15",260,74],"SPSMG9":["SPSMG9",132,76],"SR-25":["SR-25",282,67],"Scorpion EVO 3 A1":["Scorpion_EVO_3_A1",230,74],"Spear .308":["Spear_.308",180,76],"Super 90":["Super_90",270,72],"SuperNova":["SuperNova",278,60],"T-5 SMG":["T-5_SMG",136,77],"T-95 LSW":["T-95_LSW",186,76],"TCSG12":["TCSG12",185,73],"TYPE-89":["Type-89",276,71],"UMP45":["UMP45",151,78],"USP40":["USP40",104,77],"UZK50Gi":["uzk50gi",224,65],"V308":["V308",198,74],"Vector .45 ACP":["Vector_.45_ACP",134,78]};
+const GUN_SRC = n => GUN_FILE[n] ? `weapons/${encodeURIComponent(GUN_FILE[n][0])}.png` : '';
+const OP_GUN = {ash:'R4-C', thermite:'556XI', hibana:'TYPE-89', ace:'AK-12', blackbeard:'SR-25', buck:'C8-SFW', dokkaebi:'Mk 14 EBR', mute:'MP5K', smoke:'FMG-9', thatcher:'AR33', lesion:'T-5 SMG', vigil:'K1A', jager:'416-C Carbine', twitch:'F2', grim:'552 Commando', nomad:'AK-74M', deimos:'AK-74M', azami:'9x19VSN', warden:'MPX', goyo:'Vector .45 ACP', kaid:'AUG A3', caveira:'M12', solis:'P90', ela:'Scorpion EVO 3 A1'};
+const TYPES = {
+  AR:  { name: 'Rifle',          reload: 2.4, best: 'Good at any range' },
+  SMG: { name: 'SMG',            reload: 2.0, best: 'Best up close. Weak at Support' },
+  MP:  { name: 'Machine pistol', reload: 1.7, best: 'Best up close. Weak at Support' },
+  LMG: { name: 'LMG',            reload: 4.5, best: 'Huge mag, slow reload. Best at Support' },
+  DMR: { name: 'Marksman',       reload: 2.6, best: 'More headshots. Best at range' },
+  SG:  { name: 'Shotgun',        reload: 3.0, best: 'Best at Entry and Anchor. Weak at range' },
+};
+const gunOf = p => p.weapon?.name || OP_GUN[p.op] || null;
+const gunItem = n => ({ id: 'gun:' + n, name: n, gun: true, cost: 3, src: GUN_SRC(n) });
+const gunLine = n => { const [t, , , m] = WEAPONS[n], g = gameGun(n); return `${TYPES[t].name} · <b>${g.dmg}</b> dmg · <b>${g.rpm}</b> rpm · <b>${m}</b> mag · <b>${TYPES[t].reload.toFixed(1)}s</b> reload`; };
+// Attachments stay on the gun they're bought for, one of each; a new gun (or a new op's gun) comes bare.
+const ATTACH = [
+  { id:'ext',  name:'Extended Mag', att:true, cost:2, short:'MAG',  desc:'+50% mag size.' },
+  { id:'comp', name:'Compensator',  att:true, cost:2, short:'COMP', desc:'+5% hit chance.' },
+  { id:'acog', name:'ACOG',         att:true, cost:2, short:'ACOG', desc:'+6% hit at range. -4% up close.' },
+  { id:'grip', name:'Angled Grip',  att:true, cost:2, short:'GRIP', desc:'First shot 80ms faster.' },
+];
+// Gear is permanent and stacks (buy as many as you like). Scaling gear grows after every battle.
+const GEAR = [
+  { id:'kevlar', r:'common',   name:'Kevlar Vest',   gear:true, cost:3, short:'VEST',   desc:'+32 HP. From the 3rd vest, also -5% RPM.' },
+  { id:'plate', r:'common',    name:'Ceramic Plate', gear:true, cost:3, short:'PLATE',  desc:'+10 armor (blocks 10 damage per bullet). -15% fire damage. -2.5% RPM.' },
+  { id:'hollow', r:'epic',   name:'Hollow Points', gear:true, cost:3, short:'HOLLOW', desc:'+40% damage. Armor blocks double.' },
+  { id:'momentum', r:'rare', name:'Momentum',      gear:true, cost:3, short:'MOMENT', desc:'+15% damage per kill.' },
+  { id:'blood', r:'legendary',    name:'Bloodthirst',   gear:true, cost:3, short:'BLOOD',  desc:'Heal 30 HP per kill.' },
+  { id:'fresh', r:'common',    name:'Fresh Mag',     gear:true, cost:3, short:'FRESH',  desc:'+20% damage on the first half of each mag.' },
+  { id:'wind', r:'rare',     name:'Second Wind',   gear:true, cost:3, short:'WIND',   desc:'Below 50% HP: heal 35 and +40% RPM. Once per fight.' },
+  { id:'revenge', r:'common',  name:'Revenge',       gear:true, cost:3, short:'REVENGE', desc:'+35% damage for 3s when a teammate dies.' },
+  { id:'spons', r:'common',    name:'Sponsorship',   gear:true, cost:3, short:'SPONSOR', scale:true, desc:'+¢1 per battle. +¢1 more every 3 battles (max ¢4).' },
+  { id:'shred', r:'epic',    name:'Shred Rounds',  gear:true, cost:3, short:'SHRED',  desc:"Hits also deal 8% of the target's max HP. Halves Thick Skin. One per player." },
+  { id:'thick', r:'common',    name:'Thick Skin',    gear:true, cost:3, short:'SKIN',   desc:'Takes 10% less damage, plus 4% less per hit taken (max 60%). Half as strong vs Shred.' },
+  { id:'cond', r:'epic',     name:'Conditioning',  gear:true, cost:3, short:'COND',   scale:true, desc:'+12 HP. +8 more each battle.' },
+  { id:'vet', r:'legendary',      name:'Veteran',       gear:true, cost:3, short:'VET',    scale:true, desc:'+2 damage. +3 more every 4 kills.' },
+  { id:'iron', r:'rare',     name:'Iron Wall',     gear:true, cost:3, short:'IRON',   scale:true, desc:'+1 armor. +3 more every 4 battles survived.' },
+];
+const itemArt = it => it.short ? `<span class="attx">${it.short}</span>` : `<img src="${it.src || GADGET(it.img)}" alt="">`;
+// Utility is one use per battle, each with one simple effect.
+const ITEMS = [
+  { id:'frag', r:'common',   name:'Frag', img:'Frag_Grenade.png',          cost:2, desc:'May hit their lane player for 35. Blocked by ADS.' },
+  { id:'breach', r:'rare', name:'Breach Charge', img:'R6S_Breach_charge.png', cost:2, desc:'+50% damage vs their Anchor. Blocked by Mute.' },
+  { id:'stun', r:'common',   name:'Stun', img:'Stun_Grenade.png',          cost:2, desc:'Their lane player misses more for 2s. Blocked by ADS and Warden.' },
+  { id:'smoke', r:'common',  name:'Smoke', img:'Smoke_Grenade.png',        cost:2, desc:'Enemies miss more into this lane for 3s. Blocked by ADS and Warden.' },
+  { id:'hot', r:'rare',    name:'Hot Loads',    short:'HOT',   cost:2, desc:'+25% damage.' },
+  { id:'heavy', r:'epic',  name:'Heavy Rounds', short:'HEAVY', cost:2, desc:'+75% damage, -30% RPM.' },
+  { id:'hair', r:'rare',   name:'Hair Trigger', short:'HAIR',  cost:2, desc:'+45% RPM, -10% damage.' },
+  { id:'mags', r:'rare',   name:'Extra Mags',   short:'MAGS',  cost:2, desc:'2x mag size, 50% faster reloads.' },
+  { id:'trauma', r:'common', name:'Trauma Plate', short:'PLATE', cost:2, desc:'+7 armor.' },
+  { id:'steady', r:'common', name:'Steady Aim',   short:'AIM',   cost:2, desc:'+10% hit chance.' },
+  { id:'prize', r:'common',  name:'Prize Money',  short:'PRIZE', cost:2, desc:'+¢4 if they get the most kills on your team.' },
+  { id:'pain', r:'rare',   name:'Painkillers',  short:'PAIN',  cost:2, desc:'-18% damage taken.' },
+  { id:'stim', r:'common',   name:'Stim Pack',  short:'STIM',  cost:2, desc:'+35 HP.' },
+  { id:'adren', r:'rare',  name:'Adrenaline', short:'ADREN', cost:2, desc:'+40% RPM for the first 3s.' },
+  { id:'ap', r:'epic',     name:'AP Rounds',  short:'AP',    cost:2, desc:'Bullets ignore armor.' },
+  { id:'fire', r:'epic',   name:'Incendiary', short:'FIRE',  cost:2, desc:'Hits burn 3% max HP per second for 2s.' },
+  { id:'clay', r:'common',   name:'Claymore', img:'Claymore.png',          cost:2, desc:'May hit the first pusher for 35. Blocked by Grim.' },
+];
+
+/* ---------- Run state ---------- */
+const S = {
+  round: 6, wins: 4, losses: 2, credits: 10, freeRerollUsed: false, frozen: false,
+  players: [
+    P('Stompn',2025,1.17,'867-647','89-70 (+19)',35,20,15,58,'ash','goyo',['Support','Flex'],.727),
+    P('Handyy',2024,1.15,'727-553','97-69 (+28)',36,18,11,56,'ace','mute',['Flex'],.683),
+    P('Gaspro',2025,1.19,'196-137','32-15 (+17)',38,2,7,53,'hibana','mute',['IGL','Support'],.56),
+    P('Yuzus',2024,1.16,'641-451','64-35 (+29)',42,11,5,45,'dokkaebi','mute',['Flex','Support'],.595),
+    P('Kyno',2025,1.01,'661-667','72-70 (+2)',31,12,42,38,'blackbeard','smoke',['Support','Flex'],.594),
+    P('Always',2025,1.01,'435-442','65-44 (+21)',29,6,31,53,'ace','mute',['Flex'],.52),
+    P('Hatez',2025,1.01,'486-461','79-70 (+9)',31,10,10,58,'twitch','azami',['Flex'],.44),
+  ],
+  // op slots hold units { op, lvl }; equipped units live on the player (p.op, p.lvl)
+  slots: [{ op:'vigil', lvl:1 }, { op:'jager', lvl:1 }, { op:'ace', lvl:1 }, null, null, null],
+  shop: [],
+  sel: null,   // {type:'player'|'slot'|'shop'|'syn'|'lane'|'map', ...}
+  flash: null, // element key to pulse on the next render, e.g. 'p:<id>' or 'op:<op>'
+  bumpCredits: false,
+  duos: {},   // duo id -> stacks, kept all run
+};
+(function seed() {
+  const [st, ha, ga, yu, ky, al, hz] = S.players;
+  Object.assign(st, { zone:'Entry', op:'ash' });
+  Object.assign(ha, { zone:'Entry', op:'thermite' });
+  Object.assign(ga, { zone:'Anchor', op:'mute' });
+  Object.assign(yu, { zone:'Flank', op:'dokkaebi' });
+  Object.assign(ky, { zone:'Support', op:'thatcher' });
+  al.zone = 'bench'; hz.zone = 'bench';
+  [st, ha, ga, yu, ky].forEach(p => p.mastery = 5); al.mastery = hz.mastery = 2; // 6 rounds in
+  S.duos = { call: 4, trade: 3, fort: 5 };
+  S.shop = [
+    { kind:'player', p: POOL[0] }, { kind:'player', p: POOL[1] },
+    { kind:'op', op:'thermite' }, { kind:'op', op:'ash' },
+    { kind:'item', item: gunItem('AK-12') }, { kind:'item', item: ITEMS[0] },
+  ];
+})();
+
+/* ---------- Rules ---------- */
+// Operators are units: every copy you buy is its own op in a slot until 3 match, then they merge.
+// 3 copies (three L1s) → one L2; 6 copies (two L2s) → one L3.
+const COPIES = [0, 1, 3, 6];
+const unitsOf = op => [
+  ...S.slots.map((u, i) => u && u.op === op ? { where: 'slot', i, lvl: u.lvl } : null),
+  ...S.players.map(q => q.op === op ? { where: 'player', p: q, lvl: q.lvl || 1 } : null),
+].filter(Boolean);
+const ownsOp = op => unitsOf(op).length > 0;
+const copiesOf = op => unitsOf(op).reduce((a, u) => a + COPIES[u.lvl], 0);
+const topLevel = op => Math.max(1, ...unitsOf(op).map(u => u.lvl));
+// Level a purchase would reach (0 = no merge)
+const mergeLevel = op => { const us = unitsOf(op), l1 = us.filter(u => u.lvl === 1).length, l2 = us.filter(u => u.lvl === 2).length;
+  return l1 >= 2 ? (l2 >= 1 ? 3 : 2) : 0; };
+function mergeOps(op) {
+  let merged = 0;
+  for (const [from, to, need] of [[1, 2, 3], [2, 3, 2]]) {
+    for (let us = unitsOf(op).filter(u => u.lvl === from); us.length >= need; us = unitsOf(op).filter(u => u.lvl === from)) {
+      us.sort((a, b) => (b.where === 'player') - (a.where === 'player')); // a player holding one keeps the merged op
+      const [keep, ...rest] = us.slice(0, need);
+      rest.forEach(u => { if (u.where === 'slot') S.slots[u.i] = null; else { u.p.op = null; u.p.lvl = 1; } });
+      if (keep.where === 'slot') S.slots[keep.i].lvl = to; else keep.p.lvl = to;
+      merged = to;
+    }
+  }
+  return merged;
+}
+const active = () => S.players.filter(p => p.zone && p.zone !== 'bench');
+const bench = () => S.players.filter(p => p.zone === 'bench');
+const inLane = z => active().filter(p => p.zone === z);
+const selPlayer = () => S.sel?.type === 'player' ? S.players.find(x => x.id === S.sel.id) : null;
+// Gear gets pricier the more of it you own: each copy already on your team (bench included) adds ¢1.
+// Big stacks stay possible, they just take a real commitment.
+const gearOwned = id => S.players.reduce((n, p) => n + (p.gear || []).filter(x => x.id === id).length, 0);
+const costOf = c => c.kind === 'player' ? COST[c.p.rarity] : c.kind === 'op' ? 3 : c.item.gear ? c.item.cost + gearOwned(c.item.id) : c.item.cost;
+
+// One plain line for everything power() does: it all ends up as aim (hit chance + reaction speed).
+// e.g. "Aim +21% · Main op, Position"
+function aimLine(p, zone, idxInZone) {
+  const why = [];
+  if (!p.op) why.push(['No op', .85]);
+  else {
+    if ((p.lvl || 1) > 1) why.push([`Op L${p.lvl}`, [1, 1, 1.15, 1.35][p.lvl]]);
+    if (p.mains.includes(p.op)) why.push(['Main op', 1.1]);
+    if (OPS[p.op][1] === zone) why.push(['Position', 1.1]);
+  }
+  if (MAP_MODS[zone]) why.push(['Map', 1 + MAP_MODS[zone] / 100]);
+  if (idxInZone >= 2) why.push(['Crowded', .85]);
+  const pct = Math.round((why.reduce((a, [, m]) => a * m, 1) - 1) * 100);
+  if (!why.length) return '<b>Aim</b> normal';
+  return `<b class="${pct >= 0 ? 'up' : 'down'}">Aim ${pct >= 0 ? '+' : ''}${pct}%</b> · ${why.map(([t, m]) => `<span class="${m < 1 ? 'down' : 'up'}">${t}</span>`).join(' · ')}`;
+}
+function power(p, zone, idxInZone) {
+  let v = p.rating * 100;
+  if (!p.op) v *= .85;
+  else {
+    v *= [1, 1, 1.15, 1.35][p.lvl || 1];
+    if (p.mains.includes(p.op)) v *= 1.10;
+    if (OPS[p.op][1] === zone) v *= 1.10;
+  }
+  v *= 1 + (MAP_MODS[zone] || 0) / 100;
+  if (idxInZone >= 2) v *= .85; // crowding: 3rd+ in a lane
+  return Math.round(v);
+}
+const duoLive = d => !!duoCast(d, active());
+const lanePower = z => inLane(z).reduce((a, p, i) => a + power(p, z, i), 0);
+function passiveCounts() {
+  const c = {};
+  active().forEach(p => p.passives.forEach(x => c[x] = (c[x] || 0) + 1));
+  return c;
+}
+
+/* ---------- Render ---------- */
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const yr = y => `'${String(y).slice(2)}`;
+const fl = key => S.flash === key ? 'flash' : '';
+const isSel = (type, k, v) => S.sel?.type === type && (k === undefined || S.sel[k] === v);
+const modMark = z => MAP_MODS[z] ? ` <span class="${MAP_MODS[z] > 0 ? 'up' : 'down'}">${MAP_MODS[z] > 0 ? '▲' : '▼'}</span>` : '';
+
+function opIcon(op) { return op ? `<span class="op">${SVG[op] ?? ''}</span>` : ''; }
+function pips(l = 1) { return `<span class="pips">${[1,2,3].map(n => `<i class="${n <= l ? 'on' : ''}"></i>`).join('')}</span>`; }
+const nameEl = name => `<span class="nm" style="--len:${name.length}">${esc(name)}</span>`;
+
+// Does this player feed the synergy the user is inspecting?
+function synMatch(p) {
+  if (S.sel?.type !== 'syn') return false;
+  if (S.sel.k.startsWith('duo:')) { const d = DUOS.find(x => 'duo:' + x.id === S.sel.k); return [d.a, d.b].includes(flexSubs(active()).get(p) || p.role); }
+  return S.sel.k === 'main' ? !!(p.op && p.mains.includes(p.op)) : p.passives.includes(S.sel.k);
+}
+const NEXT = { name: 'Ghost', w: 5, l: 2 };
+
+function tile(p) {
+  const hl = synMatch(p) ? 'hl' : '', lv = S.lvlup && p.op === S.lvlup ? 'lvlup' : '';
+  return `<button class="tile ${p.rarity} ${hl} ${lv} ${isSel('player', 'id', p.id) ? 'sel' : ''} ${fl('p:' + p.id)}" style="--rc:var(--r-${p.rarity})" data-player="${p.id}">
+    <span class="art">${p.op ? opIcon(p.op) : SILHOUETTE}</span>
+    ${p.op && p.mains.includes(p.op) ? '<span class="star">★</span>' : ''}
+    ${p.op ? `<span class="lvl">${pips(p.lvl)}</span>` : ''}
+    ${p.buff ? `<span class="buff ${p.buff.short ? 'txt' : ''}">${p.buff.short ? `<b>${p.buff.short}</b>` : `<img src="${GADGET(p.buff.img)}" alt="">`}</span>` : ''}
+    ${p.weapon ? `<span class="buff wep"><img src="${p.weapon.src}" alt=""></span>` : ''}
+    <span class="plate">${nameEl(p.name)}</span>
+  </button>${statBlock(p)}`;
+}
+// Under each card: HP, armor, mag / damage, RPM (hover any number for its name)
+function statBlock(p) {
+  const c = cardStats(p), st = (ico, v, t) => `<span title="${t}">${ICO[ico]}<b>${v}</b></span>`;
+  return `<div class="tst">${c ? `<div>${st('hp', c.hp, 'Health')}${st('arm', c.armor, 'Armor')}${st('mag', c.mag, 'Magazine')}</div>
+    <div>${st('dmg', c.dmg, 'Damage per bullet')}${st('rpm', c.rpm, 'Rounds per minute')}</div>` : '<div class="mut">No gun</div>'}</div>`;
+}
+
+let RUN_ENDED = false; // set while the page reloads into a new run, so nothing re-saves the finished one
+// Nothing to save until a run has a mode (prep renders the default state once before it sends you to the menu)
+const saveRun = () => { if (RUN_ENDED || NOT_OWNER || !S.mode) return; try { localStorage.setItem('battler.save', JSON.stringify({ ...S, sel: null, flash: null, lvlup: null, pendingToast: null })); } catch {} };
+function render() {
+  saveRun();
+  const moving = !!selPlayer();
+
+  // HUD
+  $('roundNo').textContent = S.round;
+  { const n = S.streak || 0, el = $('streakChip'); el.hidden = Math.abs(n) < 2; el.className = `chip streak ${n > 0 ? 'w' : 'l'}`;
+    el.textContent = `${n > 0 ? 'W' : 'L'}${Math.abs(n)} +¢${streakPay(n)}`; el.title = `${Math.abs(n)}-${n > 0 ? 'win' : 'loss'} streak: +¢${streakPay(n)} after each battle`; }
+  { const n = (S.trinkets || []).length; $('trkBtn').hidden = !n; $('trkBtn').innerHTML = `◆ ${n}`; $('trkBtn').classList.toggle('sel', isSel('trk')); }
+  { const r = rankOf(loadProfile().rp); $('modeChip').innerHTML = S.mode === 'ranked' ? `<span style="color:${r.color}">${r.label}</span>` : 'CASUAL'; }
+  $('wins').textContent = S.wins; $('winsOf').textContent = S.endless ? ' ∞' : '/10';
+  S.hp ??= Math.max(1, LIVES - 2 * S.losses);
+  $('lives').innerHTML = `♥ ${S.hp}<span class="cost">-${lossCost(S.round)}</span>`;
+  $('lives').title = `Lives. A loss today costs ${lossCost(S.round)}.`;
+  $('credits').innerHTML = `<span data-num="credits" class="${S.bumpCredits ? 'bump' : ''}">${S.credits}</span>` + (interestOn(S.credits) ? `<span class="int" title="Interest: ¢1 per ¢10 you hold (max 5)">+${interestOn(S.credits)}</span>` : '');
+  $('nextOpp').textContent = `vs ${NEXT.name} ${S.wins}-${S.losses}`;
+  $('mapBtn').classList.toggle('sel', isSel('map'));
+  $('mapMods').innerHTML = Object.entries(MAP_MODS).map(([z, m]) => ` <span class="m ${m > 0 ? 'up' : 'down'}">${m > 0 ? '▲' : '▼'}${z}</span>`).join('');
+
+  // Rail: team power + synergy hexes
+  const counts = passiveCounts();
+  const mains = active().filter(p => p.op && p.mains.includes(p.op)).length;
+  // Each badge shows progress to its next tier (2 → 4); below the first tier it's just quiet text
+  $('rail').innerHTML = `<div class="syns">` +
+    `<button class="syn ${mains >= 3 ? 'on' : 'off'} ${isSel('syn', 'k', 'main') ? 'sel' : ''}" data-syn="main"><span>★<b>${mains}/3</b></span></button>` +
+    Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([k, n]) =>
+      `<button class="syn ${n >= 4 ? 'max' : n >= 2 ? 'on' : 'off'} ${isSel('syn', 'k', k) ? 'sel' : ''}" data-syn="${k}"><span>${PASSIVES[k][0]}<b>${n}/${n >= 2 ? 4 : 2}</b></span></button>`).join('') +
+    DUOS.filter(d => duoLive(d) || S.duos[d.id]).map(d => `<button class="syn ${!duoLive(d) ? 'off' : (S.duos[d.id] || 0) >= d.cap ? 'max' : 'on'} ${isSel('syn', 'k', 'duo:' + d.id) ? 'sel' : ''}" data-syn="duo:${d.id}"><span>${d.short}<b>${S.duos[d.id] || 0}/${d.cap}</b></span></button>`).join('') + '</div>';
+
+  // Team row: zone groups in battle order; empty zones show as a warning ghost
+  const groups = ZONES.map(z => ({ z: z.id, ps: inLane(z.id) }));
+  const ghosts = groups.filter(g => !g.ps.length).length;
+  const nActive = active().length;
+  const gapsW = (groups.length - 1) * .9 + groups.length * .3 + groups.reduce((a, g) => a + Math.max(0, g.ps.length - 1) * .45, 0);
+  const vars = `--cols:${nActive};--gapsW:${gapsW + ghosts * 2.6}rem`;
+  const teamEl = $('team');
+  teamEl.classList.toggle('moving', moving);
+  teamEl.classList.toggle('focus', S.sel?.type === 'syn');
+  teamEl.innerHTML = groups.map(g => {
+    if (!g.ps.length) return `<div class="zg ghost" style="${vars}" data-zone="${g.z}" data-lane="${g.z}">
+        <span class="zl" aria-hidden="true"><span class="zn">&nbsp;</span><b class="zp">&nbsp;</b></span>
+        <span class="pad"><b>⚠</b><span class="zn">${g.z.toUpperCase()}</span></span></div>`;
+    return `<div class="zg" style="${vars}" data-zone="${g.z}">
+        <button class="zl ${isSel('lane', 'z', g.z) ? 'sel' : ''}" data-lane="${g.z}"><span class="zn">${g.z.toUpperCase()}${modMark(g.z)}</span></button>
+        <div class="row">${g.ps.map((p, i) => `<div class="tcol">${tile(p)}</div>`).join('')}</div></div>`;
+  }).join('');
+
+  // Dock: bench + op sockets
+  const b = bench();
+  $('dock').innerHTML = `<div class="grp"><span class="lbl">BENCH</span>${[0,1,2].map(i => b[i]
+      ? `<button class="bslot ${isSel('player', 'id', b[i].id) ? 'sel' : ''} ${fl('p:' + b[i].id)}" style="--rc:var(--r-${b[i].rarity})" data-player="${b[i].id}">${nameEl(b[i].name)}</button>`
+      : `<button class="bslot empty ${moving ? 'target' : ''}" data-bench="1">${moving ? '↓' : ''}</button>`).join('')}</div>
+    <div class="grp"><span class="lbl">OPS</span>${S.slots.map((u, i) => u
+      ? `<button class="sock ${isSel('slot', 'i', i) ? 'sel' : ''} ${moving ? 'target' : ''} ${fl('op:' + u.op)} ${S.lvlup === u.op ? 'lvlup' : ''}" data-slot="${i}">${opIcon(u.op)}${pips(u.lvl)}</button>`
+      : `<button class="sock empty ${moving ? 'target' : ''}" data-slot="${i}"></button>`).join('')}</div>`;
+
+  // Shop
+  $('rerollBtn').innerHTML = `${REROLL_ICON}ROLL <span class="cost">¢1</span>`;
+  $('freezeBtn').classList.toggle('on', S.frozen);
+  $('shop').innerHTML = S.shop.map((c, i) => {
+    if (c.sold) return `<div class="card sold"></div>`;
+    const poor = S.credits < costOf(c) ? 'poor' : '';
+    const cls = `card ${poor} ${isSel('shop', 'i', i) ? 'sel' : ''} ${S.frozen ? 'frozen' : ''}`;
+    const price = `<span class="price">${costOf(c)}</span>`;
+    if (c.kind === 'player') {
+      const p = c.p, owned = p.mains.find(m => ownsOp(m));
+      const own = owned ? `<span class="own" title="You own their main">★${opIcon(owned)}</span>` : '';
+      return `<button class="${cls} ${owned ? 'up' : ''}" style="--rc:var(--r-${p.rarity})" data-buy="${i}">${price}${own}
+        <span class="art"><span class="rtg">${p.rating.toFixed(2)}</span></span><span class="plate">${nameEl(p.name)}</span></button>`;
+    }
+    if (c.kind === 'op') {
+      const ml = mergeLevel(c.op), badge = ml ? `<span class="badge">L${ml}!</span>` : '';
+      return `<button class="${cls} ${badge ? 'up' : ownsOp(c.op) ? 'owned' : ''}" data-buy="${i}">${price}${badge}
+        <span class="art">${opIcon(c.op)}</span><span class="plate">${nameEl(OPS[c.op][0])}</span></button>`;
+    }
+    return `<button class="${cls}" ${c.item.r ? `style="--rc:var(--r-${c.item.r})"` : ''} data-buy="${i}">${price}
+      <span class="art ${c.item.gun ? 'gunart' : ''}">${itemArt(c.item)}</span><span class="plate">${nameEl(c.item.name)}</span></button>`;
+  }).join('');
+
+  sizeRail();
+  fitNames();
+  tweenNumbers();
+  renderPop();
+  S.flash = null; S.bumpCredits = false; S.lvlup = null; // one-shot effects
+}
+
+/* ---------- Juice: counting numbers, flying cards, floating text ---------- */
+const NUMS = {};
+function tweenNumbers() {
+  document.querySelectorAll('[data-num]').forEach(el => {
+    const k = el.dataset.num, to = +el.textContent, from = NUMS[k];
+    NUMS[k] = to;
+    if (from === undefined || from === to) return;
+    el.classList.add(to > from ? 'tick-up' : 'tick-down');
+    const t0 = performance.now(), dur = 450;
+    const step = now => {
+      const f = Math.min(1, (now - t0) / dur), e = 1 - (1 - f) ** 3;
+      el.textContent = Math.round(from + (to - from) * e);
+      if (f < 1) requestAnimationFrame(step); else el.classList.remove('tick-up', 'tick-down');
+    };
+    el.textContent = from; requestAnimationFrame(step);
+  });
+}
+function floatText(el, text, good) {
+  if (!el) return;
+  const r = el.getBoundingClientRect(), f = document.createElement('div');
+  f.className = 'floater' + (good ? ' good' : ''); f.textContent = text;
+  f.style.left = `${r.left + r.width / 2}px`; f.style.top = `${r.top - 4}px`;
+  document.body.appendChild(f); setTimeout(() => f.remove(), 1200);
+}
+// A copy of the bought card flies from where it was to where it landed
+function fly(fromRect, html, toEl) {
+  if (!fromRect || !toEl) return;
+  const to = toEl.getBoundingClientRect(), c = document.createElement('div');
+  c.className = 'fly'; c.innerHTML = html;
+  Object.assign(c.style, { left: `${fromRect.left}px`, top: `${fromRect.top}px`, width: `${fromRect.width}px`, height: `${fromRect.height}px` });
+  document.body.appendChild(c);
+  const dx = to.left + to.width / 2 - (fromRect.left + fromRect.width / 2), dy = to.top + to.height / 2 - (fromRect.top + fromRect.height / 2);
+  const sc = Math.max(.3, Math.min(1, to.width / fromRect.width));
+  c.animate([{ transform: 'none', opacity: 1 }, { transform: `translate(${dx}px, ${dy}px) scale(${sc})`, opacity: .3 }],
+    { duration: 380, easing: 'cubic-bezier(.5,0,.3,1)' }).onfinish = () => c.remove();
+}
+
+// Column-wrapped flex doesn't report its width, so size the synergy column count by hand.
+function sizeRail() {
+  const box = document.querySelector('.syns'); box.style.width = '';
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+  const rows = Math.max(1, Math.floor((box.clientHeight + .3 * rem) / (2.4 * rem)));
+  const cols = Math.ceil(box.children.length / rows);
+  box.style.width = `${cols * 2.4 + (cols - 1) * .25}rem`;
+}
+
+// Shrink each name until it fits its plate; at the 12px floor, condense it horizontally instead of cutting it.
+function fitNames() {
+  document.querySelectorAll('.nm').forEach(el => {
+    el.style.fontSize = ''; el.style.transform = '';
+    const box = el.parentElement, cs = getComputedStyle(box);
+    const avail = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 4;
+    const w = el.offsetWidth; if (!w || w <= avail) return;
+    const base = parseFloat(getComputedStyle(el).fontSize), fs = Math.max(12, Math.floor(base * avail / w * 10) / 10);
+    el.style.fontSize = fs + 'px';
+    const w2 = el.offsetWidth; if (w2 > avail) el.style.transform = `scaleX(${(avail / w2).toFixed(3)})`;
+  });
+}
+
+/* Popover: all the detail text, anchored to whatever is selected */
+function renderPop() {
+  const pop = $('pop'), sel = S.sel;
+  if (!sel) { pop.hidden = true; return; }
+  let html = '', anchor, place = 'above', pc = '';
+  const row = (h, tag) => `<div class="h"><b>${h}</b>${tag ? `<span class="tag">${tag}</span>` : ''}</div>`;
+  if (sel.type === 'player') {
+    const p = selPlayer();
+    const zi = p.zone !== 'bench' ? inLane(p.zone).indexOf(p) : -1;
+    place = 'dock'; pc = `var(--r-${p.rarity})`;
+    // Three rows: name + gun, role passive, then one row of tags (bonuses green/red, everything else grey)
+    const tags = [
+      ...p.passives,
+      ...Object.entries(p.gear.reduce((a, x) => (a[x.id] = (a[x.id] || 0) + 1, a), {})).map(([id, n]) => GEAR.find(g => g.id === id).name + (n > 1 ? ' ×' + n : '')),
+      p.buff?.name,
+    ].filter(Boolean);
+    html = row(esc(p.name), gunOf(p) ? `${gunOf(p)} ${gunStats(gunOf(p), p.op ? p.lvl || 1 : 1)}` : '') +
+      (zi >= 0 ? `<div class="ln">${aimLine(p, p.zone, zi)}</div>` : '') +
+      `<div class="ln">${rpShort(p, p.zone)}</div>` +
+      (tags.length ? `<div class="ln tags">${tags.join(' · ')}</div>` : '') +
+      `<div class="acts"><button class="btn" data-act="sell">Sell ¢${COST[p.rarity] - 1}</button></div>`;
+  } else if (sel.type === 'slot') {
+    const u = S.slots[sel.i];
+    place = 'dock';
+    html = row(OPS[u.op][0], `home ${OPS[u.op][1]} · level ${u.lvl}`) +
+      `<div class="ln">3 copies = L2 · 6 copies = L3 · you have <b>${copiesOf(u.op)}</b></div><div class="hint">Tap a player to equip</div>` +
+      `<div class="acts"><button class="btn" data-act="sellop">Sell ¢${COPIES[u.lvl]}</button></div>`;
+  } else if (sel.type === 'shop') {
+    const c = S.shop[sel.i];
+    anchor = document.querySelector(`[data-buy="${sel.i}"]`);
+    if (c.kind === 'player') {
+      const p = c.p; pc = `var(--r-${p.rarity})`;
+      html = row(esc(p.name), `${p.rarity} · ${p.role}`) +
+        `${(x => x ? `<div class="ln">Top <b>${Math.max(1, 100 - x[2])}%</b> of pros${x[4] ? ` · ${esc(x[4].slice(0, 2).join(', '))}${x[4].length > 2 ? ` +${x[4].length - 2}` : ''}` : ''}</div>` : '')(impactOf(p.name))}` +
+        `<div class="ln">${rpShort(p)}</div>` +
+        `<div class="ln">${[...p.passives, 'mains ' + p.mains.map(m => OPS[m]?.[0] ?? m).join('/')].join(' · ')}</div>` +
+        `<div class="acts"><button class="btn buy" data-act="buy">Buy ¢${costOf(c)}</button></div>`;
+    } else if (c.kind === 'op') {
+      html = row(OPS[c.op][0], `operator · ${OPS[c.op][1]}`) +
+        `<div class="acts"><button class="btn buy" data-act="buy">Buy ¢${costOf(c)}</button></div>`;
+    } else {
+      const it = c.item;
+      html = it.gun ? row(it.name, `gun · ¢${it.cost} · kept`) + `<div class="ln">${gunLine(it.name)}</div><div class="ln">${TYPES[WEAPONS[it.name][0]].best}.</div><div class="hint">Tap a player to equip. Removes attachments.</div>`
+        : it.gear ? row(it.name, `${it.r} gear · ¢${costOf(c)} · kept`) + `<div class="ln">${it.desc}</div>${gearOwned(it.id) ? `<div class="ln mut">You own ${gearOwned(it.id)}. Each adds ¢1 to the price.</div>` : ''}<div class="hint">Tap a player to equip</div>`
+        : it.att ? row(it.name, `attachment · ¢${it.cost} · kept`) + `<div class="ln">${it.desc}</div><div class="hint">Tap a player to equip</div>`
+        : row(it.name, `${it.r || ''} utility · ¢${costOf(c)} · one battle`) + `<div class="ln">${it.desc}</div><div class="hint">Tap a player to use</div>`;
+    }
+  } else if (sel.type === 'syn') {
+    anchor = document.querySelector(`[data-syn="${sel.k}"]`); place = 'right';
+    if (sel.k.startsWith('duo:')) {
+      const d = DUOS.find(x => 'duo:' + x.id === sel.k), n = S.duos[d.id] || 0;
+      html = row(d.name, `${d.a} + ${d.b} · ${n}/${d.cap}`) + `<div class="ln">${n ? d.info(d.per * n) : 'No stacks yet.'} <span class="mut">Per stack: ${d.info(d.per)}</span></div>` +
+        `<div class="ln">${duoLive(d) ? '' : '<span class="warn">Off: needs both roles.</span> '}+1 stack per battle with <b>${d.a}</b> and <b>${d.b}</b> on the team. A Flex can fill one.</div>`;
+    } else if (sel.k === 'main') {
+      const n = active().filter(p => p.op && p.mains.includes(p.op)).length;
+      html = row('Main ops', `${n}/3`) + `<div class="ln">Players on a real main get +10%. Bonus at 3.</div>`;
+    } else {
+      const n = passiveCounts()[sel.k] || 0;
+      html = row(sel.k, `${n} on team · 2 / 4`) + `<div class="ln">${PASSIVES[sel.k][1]}</div><div class="ln">Activates at <b>2</b>, maxes at <b>4</b>.</div>`;
+    }
+  } else if (sel.type === 'lane') {
+    const z = ZONES.find(x => x.id === sel.z), ps = inLane(sel.z);
+    anchor = document.querySelector(`[data-lane="${sel.z}"]`); place = 'below';
+    html = row(z.id, MAP_MODS[z.id] ? `map ${MAP_MODS[z.id] > 0 ? '+' : ''}${MAP_MODS[z.id]}%` : '') +
+      `<div class="ln">${z.info}</div>${ps.length ? '' : `<div class="ln" style="color:var(--danger)">⚠ ${EMPTY_WARN[z.id]}</div>`}`;
+  } else if (sel.type === 'trk') {
+    anchor = $('trkBtn'); place = 'below';
+    html = row('Trinkets', 'whole team · permanent') + (S.trinkets || []).map(id => { const t = TRINKETS.find(x => x.id === id);
+      return `<div class="ln"><b style="color:${TIER_COLOR[t.tier]}">${t.name}</b> · ${t.desc}</div>`; }).join('') +
+      `<div class="hint">New pick every ${TRK_EVERY} rounds</div>`;
+  } else if (sel.type === 'map') {
+    anchor = $('mapBtn'); place = 'below';
+    html = row('Bank', 'next map') + `<div class="ln">${Object.entries(MAP_MODS).map(([z, m]) => `<b class="${m > 0 ? 'up' : 'down'}">${z} ${m > 0 ? '+' : ''}${m}%</b>`).join(' · ')}</div>`;
+  }
+  pop.innerHTML = html; pop.hidden = false;
+  pop.style.setProperty('--pc', pc || 'var(--gold)');
+  pop.classList.toggle('dock', place === 'dock');
+  if (place === 'dock') {
+    const b = document.querySelector('.shopbar').getBoundingClientRect();
+    // Covers the shop; grows upward only if the text needs more room
+    Object.assign(pop.style, { left: `${b.left}px`, width: `${b.width}px`, height: '', minHeight: `${b.height}px`, maxWidth: 'none' });
+    pop.style.top = `${b.bottom - Math.max(b.height, pop.offsetHeight)}px`;
+    return;
+  }
+  pop.style.width = pop.style.height = pop.style.maxWidth = pop.style.minHeight = '';
+  if (!anchor) return;
+  const a = anchor.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight, vw = innerWidth, vh = innerHeight, g = 6;
+  let x, y;
+  if (place === 'right') { x = a.right + g; y = Math.min(a.top, vh - h - g); }
+  else {
+    x = Math.min(Math.max(a.left + a.width / 2 - w / 2, g), vw - w - g);
+    y = place === 'below' ? a.bottom + g : a.top - h - g;
+    if (y + h > vh - g) y = a.top - h - g;   // flip up if no room below
+    if (y < g) y = Math.min(a.bottom + g, vh - h - g);
+  }
+  pop.style.left = `${x}px`; pop.style.top = `${Math.max(g, y)}px`;
+}
+
+/* ---------- Actions ---------- */
+let toastT;
+function toast(msg, bad) { const t = $('toast'); t.textContent = msg; t.className = 'toast show' + (bad ? ' bad' : ''); clearTimeout(toastT); toastT = setTimeout(() => t.className = 'toast', 1800); }
+function spend(n) { S.credits -= n; if (n) S.bumpCredits = true; }
+
+function addOp(op, prefer) {
+  const i = S.slots[prefer] === null ? prefer : S.slots.indexOf(null), full = i < 0;  // dropped on an empty slot: use that one
+  if (full && !mergeLevel(op)) { toast('Operator slots full', true); return false; }
+  if (full) S.slots.push({ op, lvl: 1 }); else S.slots[i] = { op, lvl: 1 };  // a full bench can still take a copy that merges
+  const lv = mergeOps(op);
+  if (full) S.slots.length = 6;
+  if (lv) S.lvlup = op;
+  const holder = S.players.find(q => q.op === op && (!lv || q.lvl === lv));
+  S.flash = holder && lv ? 'p:' + holder.id : 'op:' + op;
+  return { slot: lv ? -1 : i, merged: lv };
+}
+
+// opts.zone: drop a new player straight into a zone; opts.fromRect: where the fly animation starts
+function buy(i, target, opts = {}) {
+  const c = S.shop[i], cost = costOf(c);
+  const cardEl = document.querySelector(`[data-buy="${i}"]`);
+  const fromRect = opts.fromRect || cardEl?.getBoundingClientRect(), art = cardEl?.querySelector('.art')?.outerHTML ?? '';
+  if (S.credits < cost) return toast('Not enough credits', true);
+  if (c.kind === 'player') {
+    const toZone = opts.zone && active().length < 5 ? opts.zone : 'bench';
+    if (opts.zone && toZone === 'bench') toast('Team full. Sent to bench');
+    if (toZone === 'bench' && bench().length >= 3) return toast('Bench full. Sell someone', true);
+    const np = { ...c.p, id: c.p.id + Math.random().toString(36).slice(2, 6), zone: toZone, op: null, buff: null, weapon: null, att: [], gear: [] };
+    S.players.push(np); S.flash = 'p:' + np.id;
+  } else if (c.kind === 'op') {
+    const r = addOp(c.op, opts.slot); if (!r) return;
+    if (!r.merged && target && target.zone !== 'bench') equip(target, r.slot);
+  } else {
+    if (!target || target.zone === 'bench') return toast('Drop it on a player on the team', true);
+    if (c.item.gun) { toast(target.att.length ? `${gunOf(target)} replaced · attachments removed` : `${gunOf(target)} replaced`); target.weapon = c.item; target.att = []; }
+    else if (c.item.gear) {
+      if (c.item.id === 'shred' && target.gear.some(x => x.id === 'shred')) return toast('Already has Shred Rounds', true);
+      target.gear.push({ id: c.item.id, n: 0 });
+    }
+    else if (c.item.att) {
+      if (!gunOf(target)) return toast('Give them an op or a gun first', true);
+      if (target.att.includes(c.item.id)) return toast(`Already has ${c.item.name}`, true);
+      target.att.push(c.item.id);
+    }
+    else target.buff = c.item;
+    S.flash = 'p:' + target.id;
+  }
+  spend(cost); c.sold = true; S.sel = null;
+  const lv = S.lvlup;
+  render();
+  const landed = document.querySelector('.flash, .lvlup');
+  fly(fromRect, `<div class="card" style="width:100%;height:100%">${art}</div>`, landed);
+  floatText(document.getElementById('credits'), `-¢${cost}`);
+  if (lv) setTimeout(() => floatText(document.querySelector('.lvlup'), `${OPS[lv][0].toUpperCase()} LV ${topLevel(lv)}!`, true), 250);
+}
+
+function sellPlayer(p) {
+  if (p.op) { const i = S.slots.indexOf(null); if (i >= 0) S.slots[i] = { op: p.op, lvl: p.lvl || 1 }; }
+  const gain = COST[p.rarity] - 1;
+  S.players = S.players.filter(x => x !== p); S.credits += gain; S.bumpCredits = true; S.sel = null; render();
+  floatText(document.getElementById('credits'), `+¢${gain}`, true);
+}
+function sellOp(i) {
+  const gain = COPIES[S.slots[i].lvl];
+  S.credits += gain; S.bumpCredits = true; S.slots[i] = null; S.sel = null; render();
+  floatText(document.getElementById('credits'), `+¢${gain}`, true);
+}
+
+function reroll() {
+  const cost = 1;
+  if (S.credits < cost) return toast('Not enough credits', true);
+  spend(cost); S.freeRerollUsed = true; S.frozen = false; S.sel = null;
+  rollShop(); render();
+}
+// Price by rarity: one step per tier. Gear is permanent, utility lasts one battle so it stays cheap.
+const GEAR_COST = { common: 3, rare: 4, epic: 5, legendary: 6 }, UTIL_COST = { common: 2, rare: 2, epic: 3, legendary: 3 };
+GEAR.forEach(g => g.cost = GEAR_COST[g.r]); ITEMS.forEach(it => it.cost = UTIL_COST[it.r]);
+// Shop rarity odds by day for players and items [common, rare, epic, legendary]: the good stuff gets easier to find later in the run
+const RARITY_ODDS = day => day <= 2 ? [75, 25, 0, 0] : day <= 4 ? [55, 33, 12, 0] : day <= 6 ? [40, 35, 20, 5] : [30, 35, 25, 10];
+const RARITIES = ['common', 'rare', 'epic', 'legendary'];
+function rollShop() {
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+  const pickRare = (list, key = 'r') => {
+    const odds = RARITY_ODDS(S.round); let roll = Math.random() * 100, k = 0;
+    while (k < 3 && roll >= odds[k]) roll -= odds[k++];
+    for (; k >= 0; k--) { const got = list.filter(x => (x[key] || 'common') === RARITIES[k]); if (got.length) return pick(got); } // none at that rarity: step down
+    return pick(list);
+  };
+  const opKeys = Object.keys(OPS).filter(op => !unitsOf(op).some(u => u.lvl === 3)); // maxed ops stop showing up
+  S.shop = [
+    { kind:'player', p: pickRare(POOL, 'rarity') }, { kind:'player', p: pickRare(POOL, 'rarity') },
+    { kind:'op', op: pick(opKeys) }, { kind:'op', op: pick(opKeys) },
+    { kind:'item', item: gunItem(pick(Object.keys(WEAPONS))) },
+    { kind:'item', item: (r => r < .45 ? pickRare(ITEMS) : r < .65 ? pick(ATTACH) : pickRare(GEAR))(Math.random()) },
+  ];
+}
+
+function equip(p, slotIdx) {
+  const incoming = S.slots[slotIdx]; // may be empty: then this just unequips
+  if (!p.weapon && p.att?.length && OP_GUN[incoming?.op] !== OP_GUN[p.op]) { p.att = []; toast('New gun. Attachments removed'); } // their gun came from the op
+  S.slots[slotIdx] = p.op ? { op: p.op, lvl: p.lvl || 1 } : null;
+  p.op = incoming?.op || null; p.lvl = incoming?.lvl || 1; S.flash = 'p:' + p.id;
+}
+
+// Fullscreen hides browser chrome; on Android it also lets us lock to landscape.
+async function goFullscreen() {
+  try {
+    if (document.fullscreenElement) return document.exitFullscreen();
+    await document.documentElement.requestFullscreen();
+    await screen.orientation?.lock?.('landscape');
+  } catch { toast('No fullscreen here. Rotate your device', true); }
+}
+if (!document.documentElement.requestFullscreen) $('fsBtn').hidden = $('rotateFs').hidden = true; // e.g. iPhone Safari
+
+const toggle = s => { S.sel = S.sel && JSON.stringify(S.sel) === JSON.stringify(s) ? null : s; render(); };
+
+/* ---------- Drag and drop (tap-to-select still works as a fallback) ---------- */
+let drag = null, swallowClick = false;
+const DRAG_SRC = '[data-player],.sock[data-slot]:not(.empty),.card[data-buy]';
+const DROP_SRC = '#sellZone,[data-player],[data-slot],[data-bench],[data-zone],.dock,.stage';
+
+document.addEventListener('dragstart', e => e.preventDefault()); // native image drag would steal the gesture
+document.addEventListener('pointerdown', e => {
+  const el = e.target.closest(DRAG_SRC);
+  if (!el || e.button > 0) return;
+  drag = { el, x0: e.clientX, y0: e.clientY, ghost: null, over: null };
+});
+document.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (!drag.ghost) {
+    if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 8) return;
+    startDrag();
+  }
+  const g = drag.ghost;
+  g.style.left = `${e.clientX - drag.dx}px`; g.style.top = `${e.clientY - drag.dy}px`;
+  const t = document.elementFromPoint(e.clientX, e.clientY)?.closest(DROP_SRC);
+  const target = t && t !== drag.el && validDrop(t) ? t : null;
+  if (target !== drag.over) { drag.over?.classList.remove('over'); target?.classList.add('over'); drag.over = target; }
+});
+document.addEventListener('pointerup', () => {
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (!d.ghost) return;
+  swallowClick = true; setTimeout(() => swallowClick = false, 0);
+  const rect = d.ghost.getBoundingClientRect();
+  d.ghost.remove(); d.el.classList.remove('dragsrc'); d.over?.classList.remove('over');
+  document.body.className = '';
+  if (d.over) drop(d, d.over, rect); else render();
+});
+document.addEventListener('pointercancel', () => { if (drag?.ghost) { drag.ghost.remove(); document.body.className = ''; render(); } drag = null; });
+document.addEventListener('click', e => { if (swallowClick) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+
+function dragKind(el) {
+  if (el.dataset.player) return 'player';
+  if (el.dataset.slot !== undefined) return 'slot';
+  return 'shop' + S.shop[+el.dataset.buy].kind;
+}
+function startDrag() {
+  const el = drag.el, r = el.getBoundingClientRect();
+  drag.kind = dragKind(el); drag.dx = drag.x0 - r.left; drag.dy = drag.y0 - r.top;
+  S.sel = null; $('pop').hidden = true;
+  const g = el.cloneNode(true);
+  g.classList.add('ghostdrag'); g.classList.remove('sel', 'flash', 'over');
+  Object.assign(g.style, { width: `${r.width}px`, height: `${r.height}px`, left: `${r.left}px`, top: `${r.top}px` });
+  document.body.appendChild(g); drag.ghost = g;
+  el.classList.add('dragsrc');
+  document.body.className = `dragging drag-${drag.kind}`;
+  if (drag.kind === 'player' || drag.kind === 'slot') {
+    const val = drag.kind === 'player' ? COST[S.players.find(x => x.id === el.dataset.player).rarity] - 1 : COPIES[S.slots[+el.dataset.slot].lvl];
+    $('sellZone').textContent = `SELL  +¢${val}`;
+  }
+}
+const teamTile = t => t.dataset.player && S.players.find(x => x.id === t.dataset.player);
+function validDrop(t) {
+  const k = drag.kind;
+  if (t.id === 'sellZone') return k === 'player' || k === 'slot';
+  if (k === 'player') return !t.classList.contains('stage') && !t.classList.contains('dock');
+  if (k === 'slot') return !!teamTile(t) || (t.dataset.slot !== undefined && t !== drag.el);
+  if (k === 'shopplayer') return !t.dataset.slot && !t.dataset.player;
+  if (k === 'shopop') return true;   // a player (equips), an op slot, or anywhere else (first free slot)
+  if (k === 'shopitem') { const q = teamTile(t); return !!q && q.zone !== 'bench'; }
+  return false;
+}
+function drop(d, t, rect) {
+  const k = d.kind;
+  if (k === 'player') {
+    const p = S.players.find(x => x.id === d.el.dataset.player), q = teamTile(t);
+    if (t.id === 'sellZone') return sellPlayer(p);
+    if (q && q.zone === p.zone) { const a = S.players.indexOf(p), b = S.players.indexOf(q); [S.players[a], S.players[b]] = [q, p]; S.flash = 'p:' + p.id; return render(); } // reorder
+    if (q) { [p.zone, q.zone] = [q.zone, p.zone]; if (p.zone === 'bench') p.buff = null; if (q.zone === 'bench') q.buff = null; S.flash = 'p:' + p.id; return render(); }
+    if (t.dataset.slot !== undefined) { equip(p, +t.dataset.slot); return render(); }
+    if (t.dataset.zone) {
+      if (p.zone === 'bench' && active().length >= 5) { toast('Team full. Drop on a player to swap', true); return render(); }
+      p.zone = t.dataset.zone; S.flash = 'p:' + p.id; return render();
+    }
+    if (t.dataset.bench) {
+      if (p.zone === 'bench') { S.players.push(...S.players.splice(S.players.indexOf(p), 1)); return render(); } // to the end of the bench
+      if (p.zone !== 'bench' && bench().length >= 3) { toast('Bench full', true); return render(); }
+      p.zone = 'bench'; p.buff = null; S.flash = 'p:' + p.id; return render();
+    }
+    return render();
+  }
+  if (k === 'slot') {
+    const i = +d.el.dataset.slot;
+    if (t.id === 'sellZone') return sellOp(i);
+    if (t.dataset.slot !== undefined) { const j = +t.dataset.slot; [S.slots[i], S.slots[j]] = [S.slots[j], S.slots[i]]; return render(); } // reorder
+    const q = teamTile(t); if (q) equip(q, i);
+    return render();
+  }
+  const i = +d.el.dataset.buy;
+  if (k === 'shopplayer') return buy(i, null, { zone: t.dataset.zone, fromRect: rect });
+  if (k === 'shopop') return buy(i, teamTile(t) || null, { fromRect: rect, slot: t.dataset.slot !== undefined ? +t.dataset.slot : undefined });
+  if (k === 'shopitem') return buy(i, teamTile(t), { fromRect: rect });
+}
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-player],[data-lane],[data-zone],[data-bench],[data-slot],[data-buy],[data-act],[data-syn],[data-mode],[data-trk],#trkBtn,#rerollBtn,#freezeBtn,#readyBtn,#mapBtn,#fsBtn,#rotateFs,#menuBtn');
+  if (!t) { if (S.sel && !e.target.closest('#pop')) { S.sel = null; render(); } return; }
+
+  if (t.dataset.player) {
+    const p = S.players.find(x => x.id === t.dataset.player);
+    if (S.sel?.type === 'slot') { equip(p, S.sel.i); S.sel = null; return render(); }
+    if (S.sel?.type === 'shop' && S.shop[S.sel.i].kind === 'item') return buy(S.sel.i, p);
+    return toggle({ type:'player', id:p.id });
+  }
+  if (t.dataset.lane && !selPlayer()) return toggle({ type:'lane', z:t.dataset.lane });
+  if (t.dataset.zone || t.dataset.lane) {
+    const p = selPlayer(), z = t.dataset.zone || t.dataset.lane;
+    if (p && p.zone === 'bench' && active().length >= 5) return toast('Team full. Bench someone first', true);
+    if (p) { p.zone = z; S.flash = 'p:' + p.id; }
+    S.sel = null; return render();
+  }
+  if (t.dataset.bench) {
+    const p = selPlayer();
+    if (!p) { S.sel = null; return render(); }
+    if (p.zone !== 'bench' && bench().length >= 3) return toast('Bench full', true);
+    p.zone = 'bench'; p.buff = null; S.sel = null; S.flash = 'p:' + p.id; return render();
+  }
+  if (t.dataset.slot !== undefined) {
+    const i = +t.dataset.slot, p = selPlayer();
+    if (p) { equip(p, i); S.sel = null; return render(); }
+    if (!S.slots[i]) { S.sel = null; return render(); }
+    return toggle({ type:'slot', i });
+  }
+  if (t.dataset.trk) return takeTrinket(t.dataset.trk);
+  if (t.id === 'trkBtn') return toggle({ type:'trk' });
+  if (t.dataset.buy) return toggle({ type:'shop', i:+t.dataset.buy });
+  if (t.dataset.syn) return toggle({ type:'syn', k:t.dataset.syn });
+  if (t.dataset.act === 'buy') return buy(S.sel.i);
+  if (t.dataset.act === 'sell') return sellPlayer(selPlayer());
+  if (t.dataset.act === 'sellop') return sellOp(S.sel.i);
+  if (t.id === 'fsBtn' || t.id === 'rotateFs') return goFullscreen();
+  if (t.id === 'menuBtn') { saveRun(); location.href = 'menu.html'; return; } // the run is saved; CONTINUE picks it up
+  if (t.id === 'mapBtn') return toggle({ type:'map' });
+  if (t.id === 'rerollBtn') return reroll();
+  if (t.id === 'freezeBtn') { S.frozen = !S.frozen; return render(); }
+  if (t.id === 'readyBtn') {
+    if (S.offer) return showDrop();
+    // Hand the locked-in board to the battle screen
+    const team = active().map(p => ({ pid: p.id, mastery: p.mastery || 0, name: p.name, rarity: p.rarity, op: p.op, lvl: p.op ? p.lvl || 1 : 1, zone: p.zone, pow: power(p, p.zone, inLane(p.zone).indexOf(p)), passives: p.passives, role: p.role, rp: p.rp, buff: p.buff && { name: p.buff.name }, weapon: p.weapon && { name: p.weapon.name }, att: p.att, gear: p.gear.map(x => ({ id: x.id, n: x.n })) }));
+    S.players.forEach(p => { p.buff = null; }); // utility is spent; guns stay
+    const duos = Object.fromEntries(DUOS.filter(duoLive).map(d => [d.id, S.duos[d.id] || 0]));
+    try { localStorage.setItem('battler.run', JSON.stringify({ round: S.round, wins: S.wins, losses: S.losses, hp: S.hp, endless: !!S.endless, team, ghost: ghostFor(S.round), duos, trinkets: S.trinkets || [] }));
+          localStorage.setItem('battler.save', JSON.stringify({ ...S, sel: null, flash: null, lvlup: null })); } catch {}
+    try { localStorage.setItem('battler.phase', 'battle'); localStorage.removeItem('battler.prog'); } catch {}
+    location.href = 'battle.html?t=' + Date.now(); // fresh copy every time (no stale cache)
+    return;
+  }
+});
+window.addEventListener('resize', () => { sizeRail(); fitNames(); renderPop(); });
+
+
+// A new run starts with five random commons from the pool, one per lane, each on an op for that lane
+// (one of their own mains when it fits). No bench, no spare ops: the shop builds the rest.
+function starterTeam() {
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+  const commons = POOL.filter(p => p.rarity === 'common'), used = new Set(), ops = new Set();
+  return ZONES.map(({ id: zone }) => {
+    let p; do p = pick(commons.length >= 5 ? commons : POOL); while (used.has(p.name)); used.add(p.name);
+    const fits = p.mains.filter(o => OPS[o]?.[1] === zone && !ops.has(o));
+    const op = fits[0] || pick(Object.keys(OPS).filter(o => OPS[o][1] === zone && !ops.has(o))); ops.add(op);
+    return { ...p, id: p.id + Math.random().toString(36).slice(2, 6), zone, op, lvl: 1, mastery: 0, buff: null, weapon: null, att: [], gear: [] };
+  });
+}
+// Stand-in opponent until real ghosts (other players' saved boards) exist: a team that looks like what a
+// player would have on this day. Starts as five commons like yours; one player is upgraded every 2 days
+// (at that day's shop odds), about one gear piece a day, op levels and utility come in slowly.
+let GHOST_TUNE = { upEvery: 2, gearPerDay: .8, lvl2: .03, lvl3: .01, buff: .05 }; // per day: share of op upgrades, utility chance
+function ghostFor(day) {
+  const T = GHOST_TUNE, pick = a => a[Math.floor(Math.random() * a.length)];
+  const rare = (list, key) => { const odds = RARITY_ODDS(day); let roll = Math.random() * 100, k = 0;
+    while (k < 3 && roll >= odds[k]) roll -= odds[k++];
+    for (; k >= 0; k--) { const got = list.filter(x => (x[key] || 'common') === RARITIES[k]); if (got.length) return pick(got); }
+    return pick(list); };
+  const ups = new Set([0, 1, 2, 3, 4].sort(() => Math.random() - .5).slice(0, Math.floor((day - 1) / T.upEvery)));
+  const commons = POOL.filter(p => p.rarity === 'common'), used = new Set(S.players.map(p => p.name)), ops = new Set(); // never your own players
+  const team = ZONES.map(({ id: zone }, i) => {
+    let p; do p = ups.has(i) ? rare(POOL, 'rarity') : pick(commons.length >= 5 ? commons : POOL); while (used.has(p.name)); used.add(p.name);
+    const fits = p.mains.filter(o => OPS[o]?.[1] === zone && !ops.has(o));
+    const op = fits[0] || pick(Object.keys(OPS).filter(o => OPS[o][1] === zone && !ops.has(o))); ops.add(op);
+    const r = Math.random(), l3 = Math.max(0, T.lvl3 * (day - 6)), l2 = Math.min(.5, Math.max(0, T.lvl2 * (day - 2)));
+    return { ...p, zone, op, lvl: r < l3 ? 3 : r < l3 + l2 ? 2 : 1, gear: [], buff: null };
+  });
+  for (let i = 0; i < Math.round((day - 1) * T.gearPerDay); i++) {
+    const g = rare(GEAR.filter(x => x.id !== 'spons'), 'r'), p = pick(team);
+    if (g.id === 'shred' && p.gear.some(x => x.id === 'shred')) continue;
+    p.gear.push({ id: g.id, n: Math.floor(Math.random() * day) });
+  }
+  team.forEach(p => { if (Math.random() < Math.min(.4, T.buff * day)) p.buff = { name: rare(ITEMS, 'r').name }; });
+  return team.map(p => ({ name: p.name, rarity: p.rarity, op: p.op, lvl: p.lvl, zone: p.zone, pow: power(p, p.zone, 0), passives: p.passives,
+    role: p.role, rp: p.rp, buff: p.buff, weapon: null, att: [], gear: p.gear }));
+}
+function startRun(mode) {
+  S.players = starterTeam(); S.slots = [null, null, null, null, null, null];
+  Object.assign(S, { mode, round: 1, wins: 0, losses: 0, hp: LIVES, credits: incomeFor(1), streak: 0, investN: 0, endless: false, duos: {}, trinkets: [], offer: null, freeRerollUsed: false, frozen: false, sel: null });
+  rollShop(); render();
+}
+
+/* ---------- Trinket picks ---------- */
+function rollOffer() {
+  const tier = trkTier(S.round), owned = S.trinkets || [];
+  const pool = TRINKETS.filter(t => t.tier === tier && !owned.includes(t.id)).sort(() => Math.random() - .5);
+  S.offer = pool.length ? { tier, ids: pool.slice(0, 3).map(t => t.id) } : null;
+}
+function showDrop() {
+  const o = S.offer, c = TIER_COLOR[o.tier];
+  $('drop').innerHTML = `<div class="box"><h2>PICK A TRINKET</h2><div class="sub">Tier ${ROMAN[o.tier]} · whole team · permanent</div>
+    <div class="tcards">${o.ids.map(id => { const t = TRINKETS.find(x => x.id === id);
+      return `<button class="tcard" style="--tc:${c}" data-trk="${id}"><span class="tb">${t.short}</span><b>${t.name}</b><span>${t.desc}</span></button>`; }).join('')}</div></div>`;
+  $('drop').hidden = false;
+}
+function takeTrinket(id) {
+  const t = TRINKETS.find(x => x.id === id);
+  S.trinkets = [...(S.trinkets || []), id]; S.offer = null; $('drop').hidden = true;
+  if (t.duo) DUOS.forEach(d => S.duos[d.id] = Math.min(d.cap, (S.duos[d.id] || 0) + t.duo));
+  S.flash = null; render(); toast(`${t.name} added`);
+}
+
+/* ---------- Round loop: restore the run, then apply the battle that just finished ---------- */
+// Lives: 10 per run. A loss costs 1 on days 1-2, 2 on days 3-4, 3 from day 5.
+const LIVES = 10, lossCost = day => day <= 2 ? 1 : day <= 4 ? 2 : 3;
+// Income grows with the day: ¢6 on day 1, +¢1 a day, up to ¢12 from day 7. A new run starts with day 1's income.
+const incomeFor = day => Math.min(12, 5 + day);
+// Interest: +¢1 per ¢10 held when the round ends (max +¢5). Streaks: 2 in a row +¢1, 3–4 +¢2, 5+ +¢3 (wins or losses).
+const interestOn = c => Math.min(5, Math.floor(c / 10));
+const streakPay = n => { n = Math.abs(n); return n >= 5 ? 3 : n >= 3 ? 2 : n >= 2 ? 1 : 0; };
+function afterBattle(r) {
+  const before = active();
+  S.hp ??= Math.max(1, LIVES - 2 * S.losses);
+  if (!r.win) S.hp = Math.max(0, S.hp - lossCost(S.round));
+  S.round++; r.win ? S.wins++ : S.losses++;
+  if (r.endless) S.endless = true; // past 10 wins: keep playing, nothing else changes
+  if (S.hp <= 0 || (S.wins >= 10 && !S.endless) || r.end) {
+    const text = S.wins >= 10 ? `RUN WON${S.endless ? ' · ENDLESS' : ''} · ${S.wins}-${S.losses}` : `RUN OVER · ${S.wins}-${S.losses}`;
+    let delta = null;
+    if (S.mode === 'ranked') {
+      const P = loadProfile(), before = P.rp;
+      P.rp = Math.max(RP_FLOOR, P.rp + rpDelta(S.wins, P.rp)); delta = P.rp - before;
+      P.peak = Math.max(P.peak, P.rp); P.runs++; saveProfile(P);
+    }
+    RUN_ENDED = true; localStorage.removeItem('battler.save');
+    localStorage.setItem('battler.over', JSON.stringify({ text, delta }));
+    location.reload(); return;
+  }
+  const tr = S.trinkets || [];
+  const st = S.streak || 0; S.streak = r.win ? (st > 0 ? st + 1 : 1) : (st < 0 ? st - 1 : -1);
+  const base = incomeFor(S.round) + trkSum(tr, 'income'), interest = interestOn(S.credits), streak = streakPay(S.streak);
+  // Sponsorship (all owned, before this battle's growth), Prize Money (top killer holding it), Org Investment (grows each round)
+  const sponsor = S.players.reduce((a, p) => a + p.gear.filter(g => g.id === 'spons').reduce((b, g) => b + Math.min(4, 1 + Math.floor(g.n / 3)), 0), 0);
+  const top = Math.max(0, ...r.team.map(x => x.kills));
+  const prize = top ? r.team.filter(x => x.buff === 'Prize Money' && x.kills === top).length * 4 : 0;
+  let invest = 0; if (tr.includes('invest')) { S.investN = (S.investN || 0) + 1; invest = Math.min(10, 2 * S.investN); }
+  const pay = base + interest + streak + sponsor + prize + invest;
+  S.credits += pay; S.freeRerollUsed = false; S.sel = null;
+  const played = [];
+  r.team.forEach(x => {
+    const p = S.players.find(q => q.id === x.pid); if (!p) return;
+    played.push(p);
+    p.mastery = Math.min(MASTERY.cap, (p.mastery || 0) + 1 + trkSum(tr, 'mastery'));
+    p.gear.forEach(g => { if (g.id === 'cond') g.n++; if (g.id === 'vet') g.n += x.kills; if (g.id === 'iron' && x.alive) g.n++; if (g.id === 'spons') g.n++; });
+  });
+  DUOS.forEach(d => { if (duoCast(d, played)) S.duos[d.id] = Math.min(d.cap, (S.duos[d.id] || 0) + 1); });
+  if (!S.frozen) rollShop(); S.frozen = false;
+  S.pendingToast = `${r.win ? 'WON' : 'LOST'} · +¢${pay}${pay > base ? ` (${[interest && `${interest} interest`, streak && `${streak} streak`, sponsor && `${sponsor} sponsor`, prize && `${prize} prize`, invest && `${invest} invest`].filter(Boolean).join(', ')})` : ''} · mastery +${1 + trkSum(tr, 'mastery')}`;
+  if (S.round % TRK_EVERY === 0) rollOffer();
+}
+// One-time move: runs used to live in sessionStorage
+try { for (const k of ['battler.save', 'battler.run', 'battler.result']) { const v = sessionStorage.getItem(k); if (v && !localStorage.getItem(k)) localStorage.setItem(k, v); sessionStorage.removeItem(k); } } catch {}
+// Left during a fight (or on its result screen)? Go back to it.
+let toBattle = false;
+try { toBattle = localStorage.getItem('battler.phase') === 'battle' && !localStorage.getItem('battler.result'); } catch {}
+if (toBattle) { location.replace('battle.html?t=' + Date.now()); throw new Error('back to the fight'); } // stop here: nothing below should run or save
+try {
+  const sv = JSON.parse(localStorage.getItem('battler.save'));
+  if (sv?.players) { Object.assign(S, sv); S.slots = S.slots.map(u => typeof u === 'string' ? { op: u, lvl: 1 } : u); delete S.stacks;
+    // saved shop items are copies: refresh their text from the current tables
+    S.shop = (S.shop || []).map(c => { const f = c.item && !c.item.gun && [...ITEMS, ...ATTACH, ...GEAR].find(x => x.id === c.item.id); return f ? { ...c, item: f } : c; }); }
+  const r = JSON.parse(localStorage.getItem('battler.result'));
+  localStorage.removeItem('battler.result');
+  if (r) { localStorage.removeItem('battler.phase'); localStorage.removeItem('battler.prog'); }
+  if (r && sv && r.round === S.round) afterBattle(r);
+} catch {}
+
+render();
+addEventListener('pagehide', saveRun);
+addEventListener('visibilitychange', () => document.hidden && saveRun());
+// No run yet: start the one picked in the menu, or go back to the menu (it shows the last run's result)
+if (!S.mode) {
+  let start = null; try { start = localStorage.getItem('battler.start'); localStorage.removeItem('battler.start'); } catch {}
+  if (start === 'casual' || start === 'ranked') startRun(start);
+  else { RUN_ENDED = true; location.replace('menu.html'); throw new Error('to the menu'); }
+} else if (S.offer) showDrop();
+if (S.pendingToast) { toast(S.pendingToast); S.pendingToast = null; }
+Promise.all(Object.keys(OPS).map(k => fetch(`ops/${k}.svg`).then(r => r.text())
+  .then(t => SVG[k] = t.replace(/<switch>[\s\S]*?<\/foreignObject>/, '').replace('</switch>', ''))
+  .catch(() => {}))).then(render);
+</script>
+</body>
+</html>

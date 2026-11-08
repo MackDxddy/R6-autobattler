@@ -1,0 +1,542 @@
+{
+ "source": "Liquipedia (liquipedia.net/rainbowsix), CC-BY-SA 3.0",
+ "titles": [
+  {
+   "event": "BLAST Major/2023/Stage 1",
+   "page": "BLAST_Major/2023/Stage_1",
+   "kind": "Major",
+   "weight": 2,
+   "year": 2023,
+   "team": "w7m esports",
+   "players": [
+    "HerdsZ",
+    "Kheyze",
+    "Jv92",
+    "FelipoX",
+    "nade"
+   ]
+  },
+  {
+   "event": "BLAST Major/2023/Stage 2",
+   "page": "BLAST_Major/2023/Stage_2",
+   "kind": "Major",
+   "weight": 2,
+   "year": 2023,
+   "team": "w7m esports",
+   "players": [
+    "HerdsZ",
+    "Kheyze",
+    "Jv92",
+    "FelipoX",
+    "nade"
+   ]
+  },
+  {
+   "event": "BLAST Major/2024/Stage 1",
+   "page": "BLAST_Major/2024/Stage_1",
+   "kind": "Major",
+   "weight": 2,
+   "year": 2024,
+   "team": "beastcoast",
+   "players": [
+    "dfuzr",
+    "Gaveni",
+    "Gunnar",
+    "Hotancold",
+    "SpiriTz"
+   ]
+  },
+  {
+   "event": "BLAST Major/2024/Stage 2",
+   "page": "BLAST_Major/2024/Stage_2",
+   "kind": "Major",
+   "weight": 2,
+   "year": 2024,
+   "team": "w7m esports",
+   "players": [
+    "d4sh",
+    "Dodez",
+    "Dotz",
+    "L0BIN",
+    "volpz"
+   ]
+  },
+  {
+   "event": "BLAST Major/2025",
+   "page": "BLAST_Major/2025",
+   "kind": "Major",
+   "weight": 2,
+   "year": 2025,
+   "team": "M80",
+   "players": [
+    "Kyno",
+    "dfuzr",
+    "Gunnar",
+    "Gaveni",
+    "Hotancold"
+   ]
+  },
+  {
+   "event": "Esports World Cup/2024",
+   "page": "Esports_World_Cup/2024",
+   "kind": "Esports World Cup",
+   "weight": 2,
+   "year": 2024,
+   "team": "Team BDS",
+   "players": [
+    "Shaiiko",
+    "BriD",
+    "LikEfac",
+    "Yuzus",
+    "Solotov"
+   ]
+  },
+  {
+   "event": "Esports World Cup/2025",
+   "page": "Esports_World_Cup/2025",
+   "kind": "Esports World Cup",
+   "weight": 2,
+   "year": 2025,
+   "team": "Team Secret",
+   "players": [
+    "Savage",
+    "Jume",
+    "Adrian",
+    "Mowwwgli",
+    "NoaUrz"
+   ]
+  },
+  {
+   "event": "Esports World Cup/2026",
+   "page": "Esports_World_Cup/2026",
+   "kind": "Esports World Cup",
+   "weight": 2,
+   "year": 2026,
+   "team": "FaZe Clan",
+   "players": [
+    "VITAKING",
+    "soulz1",
+    "KDS",
+    "Handyy",
+    "Cyber"
+   ]
+  },
+  {
+   "event": "Gamers8/2022",
+   "page": "Gamers8/2022",
+   "kind": "Gamers8",
+   "weight": 1.5,
+   "year": 2022,
+   "team": "Team BDS",
+   "players": [
+    "Shaiiko",
+    "Renshiro",
+    "RaFaLe",
+    "Elemzje",
+    "BriD"
+   ]
+  },
+  {
+   "event": "Gamers8/2023",
+   "page": "Gamers8/2023",
+   "kind": "Gamers8",
+   "weight": 1.5,
+   "year": 2023,
+   "team": "Team BDS",
+   "players": [
+    "Renshiro",
+    "Shaiiko",
+    "Elemzje",
+    "BriD",
+    "LikEfac"
+   ]
+  },
+  {
+   "event": "Pro League/Season 10/Finals",
+   "page": "Pro_League/Season_10/Finals",
+   "kind": "Pro League Finals",
+   "weight": 1.5,
+   "year": 2019,
+   "team": "Natus Vincere",
+   "players": [
+    "neLo",
+    "CTZN",
+    "Kendrew",
+    "Saves",
+    "Pie"
+   ]
+  },
+  {
+   "event": "Pro League/Season 7/Finals",
+   "page": "Pro_League/Season_7/Finals",
+   "kind": "Pro League Finals",
+   "weight": 1.5,
+   "year": 2018,
+   "team": "Team Liquid",
+   "players": [
+    "nesk",
+    "ziG",
+    "Bullet1",
+    "xS3xyCake",
+    "psk1"
+   ]
+  },
+  {
+   "event": "Pro League/Season 8/Finals",
+   "page": "Pro_League/Season_8/Finals",
+   "kind": "Pro League Finals",
+   "weight": 1.5,
+   "year": 2018,
+   "team": "G2 Esports",
+   "players": [
+    "Pengu",
+    "jNSzki",
+    "Goga",
+    "Fabian",
+    "Kantoraketti"
+   ]
+  },
+  {
+   "event": "Pro League/Season 9/Finals",
+   "page": "Pro_League/Season_9/Finals",
+   "kind": "Pro League Finals",
+   "weight": 1.5,
+   "year": 2019,
+   "team": "Team Empire",
+   "players": [
+    "ShepparD",
+    "JoyStiCK",
+    "karzheka",
+    "Scyther",
+    "dan"
+   ]
+  },
+  {
+   "event": "Pro League/Year 2/Season 1/Finals",
+   "page": "Pro_League/Year_2/Season_1/Finals",
+   "kind": "Pro League Finals",
+   "weight": 1.5,
+   "year": 2017,
+   "team": "PENTA Sports",
+   "players": [
+    "Goga",
+    "Fabian",
+    "jOONAS",
+    "Pengu",
+    "KS",
+    "Falko"
+   ]
+  },
+  {
+   "event": "Pro League/Year 2/Season 2/Finals",
+   "page": "Pro_League/Year_2/Season_2/Finals",
+   "kind": "Pro League Finals",
+   "weight": 1.5,
+   "year": 2017,
+   "team": "PENTA Sports",
+   "players": [
+    "Pengu",
+    "jOONAS",
+    "Goga",
+    "KS",
+    "Fabian"
+   ]
+  },
+  {
+   "event": "Pro League/Year 2/Season 3/Finals",
+   "page": "Pro_League/Year_2/Season_3/Finals",
+   "kind": "Pro League Finals",
+   "weight": 1.5,
+   "year": 2017,
+   "team": "ENCE eSports",
+   "players": [
+    "Bounssi",
+    "Kantoraketti",
+    "Willkey",
+    "Pannari",
+    "SHA77E"
+   ]
+  },
+  {
+   "event": "Reload/2025",
+   "page": "Reload/2025",
+   "kind": "RE:LOAD",
+   "weight": 1,
+   "year": 2025,
+   "team": "FURIA",
+   "players": [
+    "FelipoX",
+    "HerdsZ",
+    "Jv92",
+    "Kheyze",
+    "nade"
+   ]
+  },
+  {
+   "event": "Six Invitational/2018",
+   "page": "Six_Invitational/2018",
+   "kind": "Six Invitational",
+   "weight": 3,
+   "year": 2018,
+   "team": "PENTA Sports",
+   "players": [
+    "Goga",
+    "Fabian",
+    "jOONAS",
+    "Pengu",
+    "SHA77E"
+   ]
+  },
+  {
+   "event": "Six Invitational/2019",
+   "page": "Six_Invitational/2019",
+   "kind": "Six Invitational",
+   "weight": 3,
+   "year": 2019,
+   "team": "G2 Esports",
+   "players": [
+    "Pengu",
+    "jNSzki",
+    "Goga",
+    "Fabian",
+    "Kantoraketti"
+   ]
+  },
+  {
+   "event": "Six Invitational/2020",
+   "page": "Six_Invitational/2020",
+   "kind": "Six Invitational",
+   "weight": 3,
+   "year": 2020,
+   "team": "Spacestation Gaming",
+   "players": [
+    "Thinkingnade",
+    "Bosco",
+    "Rampy",
+    "Fultz",
+    "Canadian"
+   ]
+  },
+  {
+   "event": "Six Invitational/2021",
+   "page": "Six_Invitational/2021",
+   "kind": "Six Invitational",
+   "weight": 3,
+   "year": 2021,
+   "team": "Ninjas in Pyjamas",
+   "players": [
+    "Kamikaze",
+    "Psycho",
+    "julio",
+    "Muzi",
+    "pino"
+   ]
+  },
+  {
+   "event": "Six Invitational/2022",
+   "page": "Six_Invitational/2022",
+   "kind": "Six Invitational",
+   "weight": 3,
+   "year": 2022,
+   "team": "TSM",
+   "players": [
+    "Achieved",
+    "Merc",
+    "Beaulo",
+    "Geometrics",
+    "Chala"
+   ]
+  },
+  {
+   "event": "Six Invitational/2023",
+   "page": "Six_Invitational/2023",
+   "kind": "Six Invitational",
+   "weight": 3,
+   "year": 2023,
+   "team": "G2 Esports",
+   "players": [
+    "Virtue",
+    "Alem4o",
+    "Doki",
+    "Blurr",
+    "Benjamaster"
+   ]
+  },
+  {
+   "event": "Six Invitational/2024",
+   "page": "Six_Invitational/2024",
+   "kind": "Six Invitational",
+   "weight": 3,
+   "year": 2024,
+   "team": "w7m esports",
+   "players": [
+    "HerdsZ",
+    "Kheyze",
+    "Jv92",
+    "FelipoX",
+    "nade"
+   ]
+  },
+  {
+   "event": "Six Invitational/2025",
+   "page": "Six_Invitational/2025",
+   "kind": "Six Invitational",
+   "weight": 3,
+   "year": 2025,
+   "team": "FaZe Clan",
+   "players": [
+    "Cyber",
+    "soulz1",
+    "VITAKING",
+    "Handyy",
+    "KDS"
+   ]
+  },
+  {
+   "event": "Six Invitational/2026",
+   "page": "Six_Invitational/2026",
+   "kind": "Six Invitational",
+   "weight": 3,
+   "year": 2026,
+   "team": "FaZe Clan",
+   "players": [
+    "VITAKING",
+    "soulz1",
+    "KDS",
+    "Handyy",
+    "Cyber"
+   ]
+  },
+  {
+   "event": "Six Major/2018",
+   "page": "Six_Major/2018",
+   "kind": "Major",
+   "weight": 2,
+   "year": 2018,
+   "team": "G2 Esports",
+   "players": [
+    "Pengu",
+    "jOONAS",
+    "Goga",
+    "Fabian",
+    "Kantoraketti"
+   ]
+  },
+  {
+   "event": "Six Major/2019",
+   "page": "Six_Major/2019",
+   "kind": "Major",
+   "weight": 2,
+   "year": 2019,
+   "team": "Team Empire",
+   "players": [
+    "ShepparD",
+    "JoyStiCK",
+    "karzheka",
+    "Scyther",
+    "Dan"
+   ]
+  },
+  {
+   "event": "Six Major/2021/Stage 2",
+   "page": "Six_Major/2021/Stage_2",
+   "kind": "Major",
+   "weight": 2,
+   "year": 2021,
+   "team": "Team oNe eSports",
+   "players": [
+    "Lagonis",
+    "KDS",
+    "Neskin",
+    "Alem4o",
+    "Levy"
+   ]
+  },
+  {
+   "event": "Six Major/2021/Stage 3",
+   "page": "Six_Major/2021/Stage_3",
+   "kind": "Major",
+   "weight": 2,
+   "year": 2021,
+   "team": "FaZe Clan",
+   "players": [
+    "Astro",
+    "cameram4n",
+    "Bullet1",
+    "Cyber",
+    "soulz1"
+   ]
+  },
+  {
+   "event": "Six Major/2022/Stage 1",
+   "page": "Six_Major/2022/Stage_1",
+   "kind": "Major",
+   "weight": 2,
+   "year": 2022,
+   "team": "DarkZero Esports",
+   "players": [
+    "Hyper",
+    "Ecl9pse",
+    "njr",
+    "Panbazou",
+    "Canadian"
+   ]
+  },
+  {
+   "event": "Six Major/2022/Stage 2",
+   "page": "Six_Major/2022/Stage_2",
+   "kind": "Major",
+   "weight": 2,
+   "year": 2022,
+   "team": "Rogue",
+   "players": [
+    "Cryn",
+    "LeonGids",
+    "Kantoraketti",
+    "Deapek",
+    "Spoit"
+   ]
+  },
+  {
+   "event": "Six Major/2022/Stage 3",
+   "page": "Six_Major/2022/Stage_3",
+   "kind": "Major",
+   "weight": 2,
+   "year": 2022,
+   "team": "Team BDS",
+   "players": [
+    "Renshiro",
+    "Shaiiko",
+    "Elemzje",
+    "BriD",
+    "LikEfac"
+   ]
+  }
+ ],
+ "missing": [
+  [
+   "Pro_League/Season_11/Finals",
+   "no 1st place yet"
+  ],
+  [
+   "Six_Invitational/2027",
+   "no 1st place yet"
+  ],
+  [
+   "Six_Major/2020/Stage_1",
+   "no 1st place yet"
+  ],
+  [
+   "Six_Major/2020/Stage_2",
+   "no 1st place yet"
+  ],
+  [
+   "Six_Major/2021/Stage_1",
+   "no 1st place yet"
+  ],
+  [
+   "Six_World_Cup/2022",
+   "no 1st place yet"
+  ]
+ ]
+}

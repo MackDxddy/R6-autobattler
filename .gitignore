@@ -1,0 +1,8 @@
+# Old copies of the pages, kept locally only
+_archive/
+# Liquipedia API cache (tools/fetch_titles.py)
+.liquipedia-cache/
+__pycache__/
+# Cloudflare local dev
+.wrangler/
+node_modules/
