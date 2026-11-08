@@ -19,4 +19,5 @@ Then open http://localhost:8080/menu.html
     python tools/make_icons.py     # app icons
 
 ## Hosting
-Cloudflare Pages, connected to this repo: no build command, output directory `public`.
+Cloudflare Workers (static assets), connected to this repo. `wrangler.jsonc` points at `public/`.
+Build command: none. Deploy command: `npx wrangler deploy`. Every push to `main` deploys.

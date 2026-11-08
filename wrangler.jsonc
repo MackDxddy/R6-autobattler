@@ -1,0 +1,11 @@
+// Cloudflare Workers config. Deploys the game in public/ as static files.
+// The name must match the Worker's name in the Cloudflare dashboard.
+{
+  "name": "r6-autobattler",
+  "compatibility_date": "2025-09-01",
+  "assets": {
+    "directory": "./public",
+    // Keep .html URLs as they are (no /menu.html -> /menu redirects), so the offline cache works
+    "html_handling": "none"
+  }
+}
