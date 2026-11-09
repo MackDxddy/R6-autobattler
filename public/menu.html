@@ -283,7 +283,7 @@ function renderHome() {
   $('last').hidden = !over;
   if (over) {
     $('last').className = 'last' + (/^RUN (OVER|QUIT)/.test(over.text) ? ' lost' : '');
-    $('last').innerHTML = esc(over.text) + (over.delta != null ? ` · <span class="${over.delta >= 0 ? 'plus' : 'minus'}">${over.delta >= 0 ? '+' : ''}${over.delta} RP</span>` : '');
+    $('last').innerHTML = esc(over.text) + (over.delta != null ? ` · <span class="${over.delta >= 0 ? 'plus' : 'minus'}">${over.delta >= 0 ? '+' : ''}${fmtK(over.delta)} RP</span>` : '');
   }
   $('rank').innerHTML = rankHTML(loadProfile().rp);
   const run = currentRun();
@@ -309,7 +309,7 @@ async function renderBoard() {
   let d; try { d = await SYNC.leaderboard(); } catch { $('lbMe').textContent = "Can't reach the server."; return; }
   if ($('vBoard').hidden) return;
   const meName = AUTH.user()?.name, row = (place, name, rp, me) => { const r = rankOf(rp);
-    return `<li class="${me ? 'me' : ''}"><span class="pl">${place}</span><span class="nm">${esc(name)}</span><span class="rk" style="color:${r.color}">${r.label}</span><span class="pts">${rp} RP</span></li>`; };
+    return `<li class="${me ? 'me' : ''}"><span class="pl">${place}</span><span class="nm">${esc(name)}</span><span class="rk" style="color:${r.color}">${r.label}</span><span class="pts">${fmtK(rp)} RP</span></li>`; };
   const top = d.top.slice(0, LB_SHOW), inTop = d.me && d.me.place <= LB_SHOW;
   $('lb').innerHTML = top.map((p, i) => row(i + 1, p.name, p.rp, inTop && i + 1 === d.me.place)).join('')
     + (d.me && !inTop ? row(d.me.place, d.me.name, d.me.rp, true) : '');

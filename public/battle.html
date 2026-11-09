@@ -442,11 +442,11 @@ const ICO = {
 const GADGET_SVG = '<svg viewBox="0 0 24 24"><path d="M12 2l8.5 5v10L12 22l-8.5-5V7z"/><circle cx="12" cy="12" r="3.2"/></svg>';
 const gadgetIcon = op => { const g = GADGETS[op]; if (!g) return ''; return g.img ? `<img src="gadgets/${g.img}.png" alt="">` : GADGET_SVG; };
 function statsHTML(u) {
-  return `<span class="st fit"><span title="Damage per bullet">${ICO.dmg}<b>${u.dmg}</b></span><span title="Rounds per minute">${ICO.rpm}<b>${u.rpm}</b></span></span>`; // the rest is one tap away
+  return `<span class="st fit"><span title="Damage per bullet">${ICO.dmg}<b>${fmtK(u.dmg)}</b></span><span title="Rounds per minute">${ICO.rpm}<b>${fmtK(u.rpm)}</b></span></span>`; // the rest is one tap away
 }
 function tileHTML(u) {
   return `<button class="tile ${u.side}" style="--rc:var(--r-${u.rarity})" data-u="${u.id}">
-    <span class="em">${opIcon(u.op)}<span class="ticks"></span>${gunIcon(u.gun)}<span class="magb"><i></i></span></span><span class="hpb"><i></i><b>${u.maxHp}</b></span><span class="nmw"><span class="nm">${esc(u.name)}</span></span><span class="stw">${statsHTML(u)}</span></button>`;
+    <span class="em">${opIcon(u.op)}<span class="ticks"></span>${gunIcon(u.gun)}<span class="magb"><i></i></span></span><span class="hpb"><i></i><b>${fmtK(u.maxHp)}</b></span><span class="nmw"><span class="nm">${esc(u.name)}</span></span><span class="stw">${statsHTML(u)}</span></button>`;
 }
 function renderBoard() {
   const lines = `<svg class="lines" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -566,7 +566,7 @@ let HP = {};
 function setHp(id, hp) {
   HP[id] = hp; const u = U(id), f = tile(id)?.querySelector('.hpb i'); if (!f) return;
   f.style.width = Math.max(0, hp / u.maxHp * 100) + '%'; f.classList.toggle('low', hp / u.maxHp < .35);
-  f.nextElementSibling.textContent = Math.max(0, Math.round(hp));
+  f.nextElementSibling.textContent = fmtK(Math.max(0, Math.round(hp)));
 }
 function pop(el, text, cls) { if (!skipping) spawn('dmg ' + cls, esc(text), at(el.querySelector('.em'), -.1 + (Math.random() - .5) * .3), 800); }
 function clearAim() { document.querySelectorAll('.tile.aim, .tile.marked').forEach(t => t.classList.remove('aim', 'marked')); }
@@ -832,7 +832,7 @@ function scoreboard() {
   };
   const mvp = rows('mine').concat(rows('theirs')).sort((a, b) => b.k - a.k || b.dmg - a.dmg)[0]?.u;
   const tr = x => `<tr class="${x.u.alive ? '' : 'dead'} ${x.u === mvp ? 'mvp' : ''}"><td class="sbname">${opIcon(x.u.op)}<span style="color:var(--r-${x.u.rarity})">${esc(x.u.name)}</span></td>
-    <td>${x.k}</td><td>${x.dmg}</td><td>${x.shots ? Math.round(100 * x.hits / x.shots) + '%' : '–'}</td><td>${x.hs}</td><td>${x.heal || '–'}</td><td class="itc">${item(x.u)}</td></tr>`;
+    <td>${x.k}</td><td>${fmtK(x.dmg)}</td><td>${x.shots ? Math.round(100 * x.hits / x.shots) + '%' : '–'}</td><td>${x.hs}</td><td>${x.heal ? fmtK(x.heal) : "–"}</td><td class="itc">${item(x.u)}</td></tr>`;
   const head = label => `<tr class="th"><th>${label}</th><th title="Kills">K</th><th title="Damage dealt">DMG</th><th title="Bullets that hit">ACC</th><th title="Headshot kills">HS</th><th title="Healing done">HEAL</th><th class="itc" title="What their one-time item did">ITEM</th></tr>`;
   return `<table class="board">${head('YOU')}${rows('mine').map(tr).join('')}${head(esc(GHOST.name.toUpperCase()))}${rows('theirs').map(tr).join('')}</table>`;
 }
@@ -846,7 +846,7 @@ function showResult(e) {
   r.innerHTML = `<div class="box"><h1>${e.win ? 'WON' : 'LOST'}</h1>
     <div class="rec"><span><small>WINS</small><b>${w}${RUN.endless ? ' ∞' : '/10'}</b></span>
       <span><small>LIVES</small><span class="lives">${Array.from({ length: LIVES }, (_, i) => `<i class="${i < hpAfter ? '' : i < hp0 ? 'x now' : 'x'}"></i>`).join('')}${e.win ? '' : `<em>-${lossCost(RUN.round)}</em>`}</span></span></div>
-    <div class="kills">${mine.map(u => `<div class="kp ${best && u.kills === best ? 'mvp' : ''} ${u.alive ? '' : 'dead'}">${opIcon(u.op)}<span class="nmw"><span class="nm">${esc(u.name)}</span></span><em>${u.kills}K</em></div>`).join('')}</div>
+    <div class="kills">${mine.map(u => `<div class="kp ${best && u.kills === best ? 'mvp' : ''} ${u.alive ? '' : 'dead'}">${opIcon(u.op)}<span class="nmw"><span class="nm">${esc(u.name)}</span></span><em>${u.kills} ${u.kills === 1 ? "kill" : "kills"}</em></div>`).join('')}</div>
     ${champ ? '<div class="why"><b>RUN WON!</b> Keep playing in Endless or start a new run.</div>' : ''}
     ${scoreboard()}
     <div class="acts"><button class="btn" id="replayBtn">REPLAY</button><button class="btn" id="statsBtn">STATS</button>${champ
@@ -877,12 +877,12 @@ function fitNames() {
 
 function showPop(u, t) {
   const pop = $('pop'), r = t.getBoundingClientRect(), hp = Math.max(0, Math.round(HP[u.id] ?? u.maxHp));
-  const st = (ico, v, title) => `<span title="${title}">${ICO[ico]}<b>${v}</b></span>`;
+  const st = (ico, v, title) => `<span title="${title}">${ICO[ico]}<b>${fmtK(v)}</b></span>`;
   const tags = [...(u.passives || []),
     ...Object.entries((u.gear || []).reduce((a, x) => (a[x.id] = (a[x.id] || 0) + 1, a), {})).map(([id, n]) => GEAR[id].name + (n > 1 ? ' ×' + n : '')),
     ...Object.entries(buffsOf(u).reduce((a, b) => (a[b.name] = (a[b.name] || 0) + 1, a), {})).map(([n, k]) => n + (k > 1 ? ' ×' + k : ''))].filter(Boolean);
   pop.innerHTML = `<div class="ph"><b style="color:var(--r-${u.rarity})">${esc(u.name)}</b><span class="mut">${esc(u.gun)}</span></div>
-    <div class="pst">${st('hp', `${hp}/${u.maxHp}`, 'Health')}${st('arm', u.block, 'Armor')}${st('dmg', u.dmg, 'Damage per bullet')}${st('rpm', u.rpm, 'Rounds per minute')}${st('mag', u.mag, 'Magazine')}</div>
+    <div class="pst">${st("hp", `${fmtK(hp)}/${fmtK(u.maxHp)}`, 'Health')}${st('arm', u.block, 'Armor')}${st('dmg', u.dmg, 'Damage per bullet')}${st('rpm', u.rpm, 'Rounds per minute')}${st('mag', u.mag, 'Magazine')}</div>
     ${u.rpx ? `<div class="ln"><b>${ROLE_PASSIVES[u.rpx.id].name}</b> ${ROLE_PASSIVES[u.rpx.id].info(u.rpx.v)}</div>` : ''}
     ${tags.length ? `<div class="ln">${tags.map(esc).join(' · ')}</div>` : ''}`;
   pop.hidden = false;

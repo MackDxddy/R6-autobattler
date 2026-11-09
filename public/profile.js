@@ -16,6 +16,8 @@ function rankOf(rp) {
   return { i, name, color, div, lo: lo + (5 - div) * 100, hi: lo + (6 - div) * 100, label: `${name} ${ROMAN[div]}` };
 }
 const rpDelta = (wins, rp) => RP_TABLE[Math.min(10, wins)] - RP_TAX * rankOf(rp).i;
+// 1234 -> 1.2K, 1234567 -> 1.2M (under 1000 shown as is)
+const fmtK = n => { const a = Math.abs(n), s = n < 0 ? "-" : ""; return !(a >= 1000) ? String(n) : a < 999950 ? s + (a / 1e3).toFixed(1) + "K" : s + (a / 1e6).toFixed(1) + "M"; };
 function loadProfile() {
   const d = { rp: RP_START, peak: RP_START, runs: 0 };
   try { return { ...d, ...JSON.parse(localStorage.getItem('battler.profile') || '{}') }; } catch { return d; }
@@ -25,7 +27,7 @@ function rankHTML(rp) {
   const r = rankOf(rp), f = r.hi ? (rp - r.lo) / (r.hi - r.lo) : 1;
   return `<div class="rankRow" style="--rk:${r.color}"><span class="rhex">${ROMAN[r.div] || '★'}</span><span class="rname">${r.label}</span></div>
     <div class="rbar" style="--rk:${r.color}"><i style="width:${Math.round(f * 100)}%"></i></div>
-    <div class="rsub">${rp} RP${r.hi ? ` · ${r.hi - rp} to next division` : ''}</div>`;
+    <div class="rsub">${fmtK(rp)} RP${r.hi ? ` · ${fmtK(r.hi - rp)} to next division` : ''}</div>`;
 }
 
 // Ends the run in progress early (QUIT RUN on the home screen or the in-run menu). A ranked run is scored

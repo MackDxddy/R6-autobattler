@@ -594,7 +594,7 @@ function cardStats(p) {
   return { hp, armor, dmg: Math.round(dmg0 * (1 + T('dmg') + T('banner') * (S.wins || 0))), rpm: Math.round(rpm0 * (1 + T('rpm'))), mag: Math.round(mag0 * (1 + T('mag'))) };
 }
 const gunStats = (n, lvl) => { const g = gameGun(n, lvl);
-  return `<span class="gst"><span title="Damage per bullet">${ICO.dmg}<b>${g.dmg}</b></span><span title="Rounds per minute">${ICO.rpm}<b>${g.rpm}</b></span></span>`; };
+  return `<span class="gst"><span title="Damage per bullet">${ICO.dmg}<b>${fmtK(g.dmg)}</b></span><span title="Rounds per minute">${ICO.rpm}<b>${fmtK(g.rpm)}</b></span></span>`; };
 const rpLine = (p, zone) => {
   const P = ROLE_PASSIVES[p.rp], z = ROLE_ZONE[P.role], half = z && zone && zone !== 'bench' && zone !== z;
   const v = P.v * (ROLE_MULT[p.rarity] || 1) * mastMul(p.mastery) * (half ? .5 : 1);
@@ -617,7 +617,7 @@ const TYPES = {
 const BASE_GUN = 'MP5'; // what a player with no op and no bought gun carries (same as battle.html)
 const gunOf = p => p.weapon?.name || OP_GUN[p.op] || BASE_GUN;
 const gunItem = n => ({ id: 'gun:' + n, name: n, gun: true, cost: 3, src: GUN_SRC(n) });
-const gunLine = n => { const [t, , , m] = WEAPONS[n], g = gameGun(n); return `${TYPES[t].name} · <b>${g.dmg}</b> dmg · <b>${g.rpm}</b> rpm · <b>${m}</b> mag · <b>${TYPES[t].reload.toFixed(1)}s</b> reload`; };
+const gunLine = n => { const [t, , , m] = WEAPONS[n], g = gameGun(n); return `${TYPES[t].name} · <b>${fmtK(g.dmg)}</b> dmg · <b>${fmtK(g.rpm)}</b> rpm · <b>${m}</b> mag · <b>${TYPES[t].reload.toFixed(1)}s</b> reload`; };
 const itemArt = it => it.short ? `<span class="attx">${it.short}</span>` : `<img src="${it.src || GADGET(it.img)}" alt="">`;
 
 /* ---------- Run state ---------- */
@@ -749,7 +749,7 @@ function tile(p) {
 }
 // Under each card: HP, armor, mag / damage, RPM (hover any number for its name)
 function statBlock(p) {
-  const c = cardStats(p), st = (ico, v, t) => `<span title="${t}">${ICO[ico]}<b>${v}</b></span>`;
+  const c = cardStats(p), st = (ico, v, t) => `<span title="${t}">${ICO[ico]}<b>${fmtK(v)}</b></span>`;
   return `<div class="tst">${c ? `<div>${st('hp', c.hp, 'Health')}${st('arm', c.armor, 'Armor')}${st('mag', c.mag, 'Magazine')}</div>
     <div>${st('dmg', c.dmg, 'Damage per bullet')}${st('rpm', c.rpm, 'Rounds per minute')}</div>` : '<div class="mut">No gun</div>'}</div>`;
 }
