@@ -475,7 +475,8 @@ function simulate(run, ghost) {
   const dmgNow = (u, st, tg) => u.dmg * (1 + my(u, 'lurker') * Math.min(5, Math.max(0, (time - CONTACT_AT[u.zone]) / 1000)) + my(u, 'hunter') * tk[u.side]
       + my(u, 'pressure') * Math.min(8, u.streak) + (alive(u.side).length >= 3 ? my(u, 'lastline') : 0) + (alive(u.side).some(x => x.zone === 'Roam') ? my(u, 'pincer') : 0) + my(u, 'adapt')) * (1 + .15 * u.momentum * u.kills) * (time > OT.at ? 1 + OT.dmg * (time - OT.at) / 1000 : 1) * (TYPES[u.cls].dmg?.[RANGE[u.zone]] ?? 1) * (tg?.zone === 'Anchor' && u.siteBonus ? 1 + u.siteBonus : 1) * (u.open ? 1.1 : 1) * (1 + .08 * supports(u.side)) * (solo(u) && has(u, 'Clutch Gene') ? 1.25 : 1)
     * (breached[other(u.side)] && u.zone === 'Entry' && st === 'early' ? 1 + WALL.breachDmg : 1)
-    * (u.fresh && u.ammo > u.mag / 2 ? 1 + .2 * u.fresh : 1) * (u.revenge && time < u.revUntil ? 1 + .35 * u.revenge : 1);
+    * (u.fresh && u.ammo > u.mag / 2 ? 1 + .2 * u.fresh : 1) * (u.revenge && time < u.revUntil ? 1 + .35 * u.revenge : 1)
+    * (has(u, 'Winner') && alive(u.side).length > alive(other(u.side)).length ? 1.15 : 1); // Winner: plays from in front
   const takeMul = (t, shred) => (1 - t.dr) * (1 - Math.min(SKIN_CAP, t.thick * (shred ? SHRED_SKIN : 1) * (SKIN_BASE + SKIN * t.hits))) * (t.zone === 'Anchor' && wall[t.side] && !breached[t.side] ? 1 - WALL.dr : 1); // share of damage that gets through
 
   // Everyone runs on one clock. Each player fires bursts on their own rhythm: a burst is a fixed trigger-pull,

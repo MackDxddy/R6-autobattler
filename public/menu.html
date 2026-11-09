@@ -70,9 +70,13 @@
   .btn.warn { border-color: var(--accent); color: var(--accent); }
   .btn.danger { border-color: var(--danger); color: var(--danger); }
   .quitNote { color: var(--danger); font-size: .86rem; text-align: center; }
-  .btn small { font-weight: 500; letter-spacing: .06em; font-size: .78rem; opacity: .8; }
+  .btn small { font-weight: 500; letter-spacing: .06em; font-size: max(12px, .78rem); opacity: .8; }
   .row { display: flex; gap: .6rem; } .row > * { flex: 1 1 0; min-width: 0; }
   .row > .btn { flex: 1; }
+  /* Narrow phones: tighter spacing so the title and buttons fit */
+  @media (max-width: 640px) { .app { gap: 1.2rem; padding-left: max(1rem, var(--sa-left, env(safe-area-inset-left))); padding-right: max(1rem, var(--sa-right, env(safe-area-inset-right))); }
+    .brand h1 { font-size: 1.8rem; letter-spacing: .1em; } .panel { padding: 1rem; }
+    .btn { padding: 0 .4rem; letter-spacing: .06em; } .btn.big { letter-spacing: .14em; } .btn small { white-space: normal; letter-spacing: 0; } }
 
   /* Login */
   label { font-size: .86rem; letter-spacing: .2em; color: var(--muted); font-weight: 700; }
@@ -100,7 +104,7 @@
   .lb .pl { width: 1.8rem; color: var(--muted); text-align: right; }
   .lb .nm { flex: 1; min-width: 0; color: var(--hi); font-weight: 700; }
   .lb li.me .nm { color: var(--accent); }
-  .lb .rk { font-size: .78rem; letter-spacing: .08em; font-weight: 700; }
+  .lb .rk { font-size: max(12px, .78rem); letter-spacing: .08em; font-weight: 700; }
   .lb .pts { width: 4.2rem; text-align: right; color: var(--muted); }
   .rankRow { display: flex; align-items: center; gap: .7rem; }
   .rhex { width: 2.4rem; height: 2.2rem; clip-path: polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0 50%); background: var(--rk);

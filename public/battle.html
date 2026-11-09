@@ -103,7 +103,7 @@
   .tile.theirs .gun { transform: translateX(-50%) scaleX(-1); }
   .tile.firing .gun { animation: recoil .12s ease-out; }
   .tile.reloading .gun { opacity: .35; rotate: 25deg; transition: rotate .15s, opacity .15s; }
-  .tile.reloading .em::after { content: 'RELOAD'; position: absolute; left: 0; right: 0; bottom: 30%; text-align: center; font-size: .75rem; font-weight: 700; letter-spacing: .08em; color: var(--accent); text-shadow: 0 0 .25rem #000; z-index: 3; }
+  .tile.reloading .em::after { content: 'RELOAD'; position: absolute; left: 0; right: 0; bottom: 30%; text-align: center; font-size: max(12px, .75rem); font-weight: 700; letter-spacing: .08em; color: var(--accent); text-shadow: 0 0 .25rem #000; z-index: 3; }
   @keyframes recoil { 50% { translate: -3px 0; rotate: -4deg; } }
   .tile.theirs.firing .gun { animation-name: recoil-b; }
   @keyframes recoil-b { 50% { translate: 3px 0; rotate: -4deg; } }
@@ -224,7 +224,9 @@
   .board th:first-child { text-align: left; color: var(--hi); }
   .board td { padding: .18em 1em; text-align: right; color: var(--fg); font-variant-numeric: tabular-nums; }
   .board td.sbname { display: flex; align-items: center; gap: .5em; text-align: left; white-space: nowrap; }
-  .board .itc { text-align: left; white-space: normal; max-width: 13em; line-height: 1.2; } .board .itn { color: var(--muted); }
+  .board .itc { text-align: left; white-space: normal; max-width: 19em; line-height: 1.2; } .board .itn { color: var(--muted); } .board .itr { white-space: nowrap; }
+  /* Short phones: tighter rows so both teams and the buttons fit */
+  @media (max-height: 420px) { .board td { padding: .05em .7em; } .board th { padding: .3em .7em .1em; } .result.stats .box { gap: .45rem; } }
   .board td.sbname .op { width: 1.3em; height: 1.3em; color: var(--primary); }
   .board tr.dead td { opacity: .55; } .board tr.mvp td:nth-child(2) { color: var(--accent); font-weight: 700; }
   .result .acts { display: flex; gap: .5rem; }
@@ -812,7 +814,7 @@ function scoreboard() {
       : it.hit ? '+' + pl(f, 'hit')
       : it.armor || it.dr ? `${f} dmg blocked`
       : `+${f} dmg`;
-    return `<span class="itn">${esc(n)}${cnt > 1 ? ' ×' + cnt : ''}</span> ${r}`;
+    return `<span class="itn">${esc(n)}${cnt > 1 ? ' ×' + cnt : ''}</span> <span class="itr">${r}</span>`;
   };
   const mvp = rows('mine').concat(rows('theirs')).sort((a, b) => b.k - a.k || b.dmg - a.dmg)[0]?.u;
   const tr = x => `<tr class="${x.u.alive ? '' : 'dead'} ${x.u === mvp ? 'mvp' : ''}"><td class="sbname">${opIcon(x.u.op)}<span style="color:var(--r-${x.u.rarity})">${esc(x.u.name)}</span></td>
