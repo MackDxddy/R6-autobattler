@@ -209,7 +209,7 @@
   .tool .cost { color: var(--accent); font-weight: 700; }
   .tool .free { color: var(--primary); font-weight: 700; }
   .tool.on { border-color: var(--r-rare); color: var(--r-rare); } .tool.on svg.i { color: var(--r-rare); }
-  .shop { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); gap: .45rem; }
+  .shop { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); gap: .35rem; }
   .card { position: relative; min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .2rem; padding: .3rem .25rem;
     border: 1px solid var(--border); border-top: 3px solid var(--rc, var(--border)); background: var(--secondary); border-radius: 2px; }
   .card.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); border-top-color: var(--rc, var(--accent)); }
@@ -875,13 +875,18 @@ function sizeRail() {
 // Shrink each name until it fits its plate; at the 12px floor, condense it horizontally instead of cutting it.
 function fitNames() {
   document.querySelectorAll('.nm').forEach(el => {
-    el.style.fontSize = ''; el.style.transform = '';
+    el.style.fontSize = el.style.transform = el.style.whiteSpace = el.style.width = '';
     const box = el.parentElement, cs = getComputedStyle(box);
     const avail = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 4;
     const w = el.offsetWidth; if (!w || w <= avail) return;
     const base = parseFloat(getComputedStyle(el).fontSize), fs = Math.max(12, Math.floor(base * avail / w * 10) / 10);
     el.style.fontSize = fs + 'px';
-    const w2 = el.offsetWidth; if (w2 > avail) el.style.transform = `scaleX(${(avail / w2).toFixed(3)})`;
+    let w2 = el.offsetWidth;
+    // Two-word names on shop cards go onto two lines rather than being squeezed hard
+    if (w2 > avail * 1.2 && el.closest('.card') && el.textContent.trim().includes(' ')) {
+      Object.assign(el.style, { whiteSpace: 'normal', width: avail + 'px', textAlign: 'center' }); w2 = el.scrollWidth;
+    }
+    if (w2 > avail) el.style.transform = `scaleX(${(avail / w2).toFixed(3)})`;
   });
 }
 
@@ -1072,7 +1077,6 @@ function reroll() {
   spend(cost); S.freeRerollUsed = true; S.frozen = false; S.sel = null;
   rollShop(); render();
 }
-const playerRound = () => S.round % 2 === 1;
 function rollShop() {
   const pick = a => a[Math.floor(Math.random() * a.length)];
   const pickRare = (list, key = 'r') => {
@@ -1083,11 +1087,10 @@ function rollShop() {
   };
   const opKeys = Object.keys(OPS).filter(op => !unitsOf(op).some(u => u.lvl === 3)); // maxed ops stop showing up
   const misc = () => (r => r < .45 ? pickRare(ITEMS) : r < .65 ? pick(ATTACH) : pickRare(GEAR))(Math.random());
-  // Players are for sale every other round (odd rounds); in between those two cards are an extra op and item
+  // 3 players, 4 ops, 2 items (a gun and one other)
   S.shop = [
-    ...(playerRound() ? [{ kind:'player', p: pickRare(POOL, 'rarity') }, { kind:'player', p: pickRare(POOL, 'rarity') }]
-      : [{ kind:'op', op: pick(opKeys) }, { kind:'item', item: misc() }]),
-    { kind:'op', op: pick(opKeys) }, { kind:'op', op: pick(opKeys) },
+    ...[0, 1, 2].map(() => ({ kind:'player', p: pickRare(POOL, 'rarity') })),
+    ...[0, 1, 2, 3].map(() => ({ kind:'op', op: pick(opKeys) })),
     { kind:'item', item: gunItem(pick(Object.keys(WEAPONS))) },
     { kind:'item', item: misc() },
   ];
