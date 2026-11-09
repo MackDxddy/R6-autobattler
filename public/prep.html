@@ -202,21 +202,19 @@
   .target { border-color: var(--primary) !important; border-style: dashed !important; }
 
   /* ---------- Bottom bar: Roll/Freeze · shop cards · READY ---------- */
-  .shopbar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .5rem; align-items: stretch; height: 8.2rem; }
+  .shopbar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .5rem; align-items: stretch; height: 8.2rem; grid-template-rows: minmax(0, 1fr); }
   .tools { display: flex; flex-direction: column; gap: .35rem; width: 4.2rem; }
   .tool { flex: 1; border: 1px solid var(--border); border-radius: 2px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .1rem; font-size: .86rem; letter-spacing: .04em; line-height: 1.1; color: var(--muted); }
   .tool svg.i { font-size: 1.15rem; color: var(--fg); }
   .tool .cost { color: var(--accent); font-weight: 700; }
   .tool .free { color: var(--primary); font-weight: 700; }
   .tool.on { border-color: var(--r-rare); color: var(--r-rare); } .tool.on svg.i { color: var(--r-rare); }
-  /* Two rows: players and items on top, ops below. Cards are short and wide: picture left, name right */
-  .shop { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: .3rem; }
-  .shop .card { flex-direction: row; gap: .25rem; padding: .15rem .3rem; border-top-width: 1px; border-left: 3px solid var(--rc, var(--border)); }
-  .shop .card .art { flex: 0 0 42%; height: 100%; padding-top: .9rem; }
-  .shop .card .plate { flex: 1; min-width: 0; justify-content: flex-start; }
+  /* Two rows: players and items on top, ops below. Rating, icon or picture above the name */
+  .shop { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: .3rem; min-height: 0; height: 100%; }
+  .shop .card { gap: .1rem; padding: .15rem .3rem; border-top-width: 1px; border-left: 3px solid var(--rc, var(--border)); }
+  .shop .card .art { flex: 1; width: 100%; padding-top: .2rem; }
+  .shop .card .plate { flex: 0 0 auto; width: 100%; justify-content: center; }
   .shop .card .rtg { font-size: 1.25rem; }
-  .shop .card.itm { flex-direction: column; gap: .1rem; }   /* guns and items: picture above the name */
-  .shop .card.itm .art { flex: 1; width: 100%; padding-top: .75rem; } .shop .card.itm .plate { flex: 0 0 auto; width: 100%; justify-content: center; }
   .card { position: relative; min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .2rem; padding: .3rem .25rem;
     border: 1px solid var(--border); border-top: 3px solid var(--rc, var(--border)); background: var(--secondary); border-radius: 2px; }
   .card.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); border-top-color: var(--rc, var(--accent)); }
@@ -822,7 +820,7 @@ function render() {
       return `<button class="${cls} ${badge ? 'up' : ownsOp(c.op) ? 'owned' : ''}" data-buy="${i}">${price}${badge}
         <span class="art">${opIcon(c.op)}</span><span class="plate">${nameEl(OPS[c.op][0])}</span></button>`;
     }
-    return `<button class="${cls} itm" ${c.item.r ? `style="--rc:var(--r-${c.item.r})"` : ''} data-buy="${i}">${price}
+    return `<button class="${cls}" ${c.item.r ? `style="--rc:var(--r-${c.item.r})"` : ''} data-buy="${i}">${price}
       <span class="art ${c.item.gun ? 'gunart' : ''}">${itemArt(c.item)}</span><span class="plate">${nameEl(c.item.name)}</span></button>`;
   }).join('');
 
