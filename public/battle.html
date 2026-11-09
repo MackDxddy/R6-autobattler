@@ -521,9 +521,10 @@ const GHOST = { name: 'Ghost', w: 5, l: 2, team: [
 ]};
 
 
-// Ghosts are matched on wins and losses
-GHOST.w = RUN.wins; GHOST.l = RUN.losses;
-if (RUN.ghost?.length) GHOST.team = RUN.ghost; // prep builds one per day until real ghosts exist
+// The opponent prep picked: a real player's board from this round, or an AI board ('AI')
+GHOST.name = RUN.ghostName || 'AI';
+GHOST.w = RUN.ghostW ?? RUN.wins; GHOST.l = RUN.ghostL ?? RUN.losses;
+if (RUN.ghost?.length) GHOST.team = RUN.ghost;
 
 function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const hash = s => [...s].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619), 2166136261);

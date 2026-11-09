@@ -31,3 +31,14 @@ export const handle = fn => async ctx => {
   try { return await fn(ctx); }
   catch (e) { if (e instanceof Response) return e; console.error(e); return fail(500, 'Server error'); }
 };
+
+// Fixed-window rate limit: true while `key` has been used fewer than `max` times in the last `windowMs`.
+// Keys are hashed, so no raw IPs are stored.
+export async function allow(env, key, max, windowMs) {
+  const k = await sha256(key), now = Date.now(), start = now - (now % windowMs);
+  const row = await env.DB.prepare(
+    `INSERT INTO rate (key, window, count) VALUES (?, ?, 1)
+     ON CONFLICT(key) DO UPDATE SET count = CASE WHEN window = excluded.window THEN count + 1 ELSE 1 END, window = excluded.window
+     RETURNING count`).bind(k, start).first();
+  return (row?.count ?? 1) <= max;
+}

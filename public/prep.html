@@ -224,6 +224,7 @@
   .price { position: absolute; top: .2rem; left: .3rem; color: var(--accent); font-weight: 700; font-size: .86rem; }
   .price::before { content: "¢"; }
   .badge { position: absolute; top: .2rem; right: .25rem; font-size: .86rem; color: var(--bg); background: var(--accent); padding: .1rem .25rem; font-weight: 700; }
+  .ready.wait { opacity: .6; pointer-events: none; }
   .ready { width: 7rem; background: var(--primary); color: var(--bg); font-weight: 700; letter-spacing: .2em; border-radius: 2px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .2rem; }
   .ready b { font-size: 1rem; }
   .ready small { font-size: .86rem; letter-spacing: 0; opacity: .75; white-space: nowrap; }
@@ -1351,16 +1352,22 @@ document.addEventListener('click', e => {
   if (t.id === 'readyBtn') {
     if (S.offer) return showDrop();
     if (!active().length) return toast('Put a player on the team first', true);
+    if (readying) return;
     // Hand the locked-in board to the battle screen
     const team = active().map(p => ({ pid: p.id, mastery: p.mastery || 0, name: p.name, rarity: p.rarity, op: p.op, lvl: p.op ? p.lvl || 1 : 1, zone: p.zone, pow: power(p, p.zone, inLane(p.zone).indexOf(p)), passives: p.passives, role: p.role, rp: p.rp, buff: p.buff && { name: p.buff.name }, weapon: p.weapon && { name: p.weapon.name }, att: p.att, gear: p.gear.map(x => ({ id: x.id, n: x.n })) }));
     S.players.forEach(p => { p.buff = null; }); // utility is spent; guns stay
     const duos = Object.fromEntries(DUOS.filter(duoLive).map(d => [d.id, S.duos[d.id] || 0]));
-    const ghost = ghostFor(S.round);
-    try { localStorage.setItem('battler.run', JSON.stringify({ round: S.round, wins: S.wins, losses: S.losses, hp: S.hp, endless: !!S.endless, team, ghost, duos, trinkets: S.trinkets || [] }));
-          localStorage.setItem('battler.save', JSON.stringify({ ...S, sel: null, flash: null, lvlup: null })); } catch {}
-    try { localStorage.setItem('battler.phase', 'battle'); localStorage.removeItem('battler.prog'); } catch {}
-    SYNC.board({ mode: S.mode, round: S.round, wins: S.wins, losses: S.losses, team }); // future ghost for other players
-    location.replace('battle.html?t=' + Date.now()); // fresh copy every time (no stale cache)
+    SYNC.board({ mode: S.mode, round: S.round, wins: S.wins, losses: S.losses, team }); // future opponent for other players
+    // Opponent: a real board from this round if the server has one (waits up to 2.5s), else an AI board
+    readying = true; $('readyBtn').classList.add('wait');
+    SYNC.opponent(S.round, S.wins).then(real => {
+      const theirs = real && cleanGhost(real.team);
+      const opp = theirs ? { ghost: theirs, ghostName: real.name, ghostW: real.wins, ghostL: real.losses } : { ghost: ghostFor(S.round), ghostName: 'AI' };
+      try { localStorage.setItem('battler.run', JSON.stringify({ round: S.round, wins: S.wins, losses: S.losses, hp: S.hp, endless: !!S.endless, team, ...opp, duos, trinkets: S.trinkets || [] }));
+            localStorage.setItem('battler.save', JSON.stringify({ ...S, sel: null, flash: null, lvlup: null })); } catch {}
+      try { localStorage.setItem('battler.phase', 'battle'); localStorage.removeItem('battler.prog'); } catch {}
+      location.replace('battle.html?t=' + Date.now()); // fresh copy every time (no stale cache)
+    });
     return;
   }
 });
@@ -1404,6 +1411,31 @@ function startRun(mode) {
   S.players = []; S.draft = null; S.slots = [null, null, null, null, null, null];
   Object.assign(S, { mode, round: 1, wins: 0, losses: 0, hp: LIVES, credits: incomeFor(1), streak: 0, investN: 0, endless: false, duos: {}, trinkets: [], offer: null, freeRerollUsed: false, frozen: false, sel: null });
   rollShop(); rollDraft(); render(); showDraft();
+}
+
+/* ---------- Real opponents ---------- */
+let readying = false; // READY pressed, waiting for the opponent
+// A board from another player, rebuilt from this game's own tables. Players or values the game doesn't know
+// are dropped, and each player's power is worked out here instead of trusting the upload.
+function cleanGhost(team) {
+  if (!Array.isArray(team)) return null;
+  const zones = ZONES.map(z => z.id), gearIds = new Set(GEAR.map(g => g.id)), attIds = new Set(ATTACH.map(a => a.id));
+  const items = new Set(ITEMS.map(i => i.name)), seen = new Set(), lane = {}, out = [];
+  for (const g of team.slice(0, 5)) {
+    const base = g && POOL.find(p => p.name === g.name);
+    if (!base || seen.has(base.name) || !zones.includes(g.zone)) continue;
+    seen.add(base.name);
+    const op = OPS[g.op] ? g.op : null, lvl = op ? Math.min(3, Math.max(1, g.lvl | 0 || 1)) : 1;
+    let shred = false;
+    const gear = (Array.isArray(g.gear) ? g.gear : []).filter(x => gearIds.has(x?.id) && (x.id !== 'shred' || !shred && (shred = true)))
+      .slice(0, 8).map(x => ({ id: x.id, n: Math.min(60, Math.max(0, x.n | 0)) }));
+    const idx = (lane[g.zone] = (lane[g.zone] ?? -1) + 1);
+    out.push({ name: base.name, rarity: base.rarity, role: base.role, rp: base.rp, passives: base.passives, zone: g.zone, op, lvl,
+      mastery: Math.min(MASTERY.cap, Math.max(0, g.mastery | 0)), pow: power({ ...base, op, lvl }, g.zone, idx),
+      buff: items.has(g.buff?.name) ? { name: g.buff.name } : null, weapon: WEAPONS[g.weapon?.name] ? { name: g.weapon.name } : null,
+      att: [...new Set((Array.isArray(g.att) ? g.att : []).filter(a => attIds.has(a)))].slice(0, 4), gear });
+  }
+  return out.length ? out : null;
 }
 
 /* ---------- Starting draft: a new run offers 5 random commons; you keep 3 for free ---------- */

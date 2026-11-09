@@ -42,5 +42,16 @@ window.SYNC = (() => {
     call('PUT', 'save', { data: { save: get('battler.save'), profile: get('battler.profile') } }, { keepalive: true }).catch(() => {});
   }
 
-  return { register, rename, backup, board };
+  // A real opponent for this round: { name, wins, losses, team } or null (none yet, offline, or too slow).
+  async function opponent(round, wins, ms = 2500) {
+    const u = await Promise.race([register(), new Promise(r => setTimeout(() => r(null), ms))]);
+    if (!u?.token) return null;
+    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), ms);
+    try {
+      const res = await fetch(`/api/opponent?round=${round}&wins=${wins}`, { headers: { authorization: `Bearer ${u.id}.${u.token}` }, signal: ctl.signal });
+      return res.ok ? (await res.json()).board : null;
+    } catch { return null; } finally { clearTimeout(timer); }
+  }
+
+  return { register, rename, backup, board, opponent };
 })();
