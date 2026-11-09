@@ -155,7 +155,7 @@
   .tile { --rc: var(--r-common); position: relative; width: var(--tw); height: calc(var(--tw) / .76); display: flex; flex-direction: column;
     background: hsl(220 15% 13% / .95); border: 1px solid var(--border); border-top: 3px solid var(--rc); border-radius: 2px; }
   .tile.sel { border-color: var(--accent); border-top-color: var(--rc); box-shadow: 0 0 0 1px var(--accent); }
-  .tile .art { flex: 1; min-height: 0; display: grid; place-items: center; padding: 16% 16% 4%; }
+  .tile .art { flex: 1; min-height: 0; display: grid; place-items: center; padding: max(16%, 1rem) 16% 4%; } /* top room for the level diamonds */
   .tile .art .op, .tile .art .sil { width: 100%; height: 100%; }
   .tile .art .sil { fill: hsl(140 20% 18%); }
   .tile .plate { padding: .15rem .15rem .4rem; display: flex; justify-content: center; overflow: hidden; }
@@ -170,7 +170,15 @@
   .tile .buff { position: absolute; left: .2rem; bottom: 1.9rem; width: 1.5rem; height: 1.5rem; border: 1px solid var(--accent); background: var(--bg); display: grid; place-items: center; }
   .pop .mut { color: var(--muted); } .pop .warn { color: var(--accent); }
   .tile .buff.txt { width: auto; padding: 0 .25rem; } .tile .buff.txt b { font-size: max(12px, .75rem); color: var(--accent); letter-spacing: .04em; }
-  .tile .buff.wep { left: auto; right: .2rem; width: 2.4rem; }
+  .tile .buff.wep { width: 2.4rem; }
+  /* Item and gun get their own row under the op icon so they never cover it */
+  .tile .gear { flex: none; display: flex; justify-content: space-between; align-items: center; gap: .2rem; padding: 0 .2rem; height: 1.45rem; }
+  .tile .gear .buff { position: relative; left: auto; right: auto; bottom: auto; height: 100%; }
+  .tile .gear .buff:has(em) { width: auto; display: flex; align-items: center; gap: .1rem; padding-left: .12rem; }
+  .tile .gear .buff:has(em) img { width: 1.1rem; height: 1.1rem; }
+  .tile .gear .buff em { position: static; padding: 0 .12rem; }
+  .tile .gear .buff.wep { width: auto; flex: 0 1 2.4rem; min-width: 1.3rem; }
+  .tile .gear .buff.wep img { width: 88%; }
   .tile .buff.wep img { filter: invert(.86); }
   .attx { font-size: 1.1rem; font-weight: 700; letter-spacing: .06em; color: var(--hi); border: 1px solid var(--border); padding: .2rem .35rem; border-radius: 2px; }
   .tile .buff img { width: 80%; height: 80%; object-fit: contain; filter: var(--tint); }
@@ -309,10 +317,10 @@
     .shop .card { padding: .05rem .25rem; gap: 0; } .shop .card .art { padding-top: 0; } .shop .card .rtg { font-size: 1rem; }
     .shop .card .nm { font-size: 12px; } .price, .card .own { font-size: 12px; top: .05rem; }
     .tools { gap: .2rem; } .tool { gap: 0; min-height: 0; overflow: hidden; } .tool svg.i { font-size: 1rem; } }
-  /* Narrow phones: the stats under each card wrap to fit the card instead of widening the board */
-  /* Narrow phones: smaller bench/op slots, and card stats in two columns so they're no wider than the card */
+  /* Narrow phones: smaller bench/op slots, card stats in two columns so they're no wider than the card,
+     and no gear row (cards are too small; item and gun show when you tap the player) */
   @media (max-width: 640px) { .dock { gap: .6rem; } .bslot { width: 4.5rem; } .sock { width: 2.3rem; }
-    .zg { --tstH: 44px; } .tst { display: grid; grid-template-columns: auto auto; column-gap: .35rem; } .tst > div { display: contents; } }
+    .zg { --tstH: 44px; } .tst { display: grid; grid-template-columns: auto auto; column-gap: .35rem; } .tst > div { display: contents; } .tile .gear { display: none; } }
   @media (max-width: 760px) { .mapChip .mods { display: none; } .hud { gap: .7rem; } .dock { gap: .9rem; } }
 
   .rotate { display: none; position: fixed; inset: 0; place-items: center; text-align: center; padding: 1.5rem; }
@@ -736,8 +744,7 @@ function tile(p) {
     <span class="art">${p.op ? opIcon(p.op) : SILHOUETTE}</span>
     ${p.op && p.mains.includes(p.op) ? '<span class="star">★</span>' : ''}
     ${p.op ? `<span class="lvl">${pips(p.lvl)}</span>` : ''}
-    ${(b => b ? `<span class="buff ${b.short ? 'txt' : ''}">${b.short ? `<b>${b.short}</b>` : `<img src="${GADGET(b.img)}" alt="">`}${p.buffs.length > 1 ? `<em>×${p.buffs.length}</em>` : ''}</span>` : '')(p.buffs?.[0])}
-    ${p.weapon ? `<span class="buff wep"><img src="${p.weapon.src}" alt=""></span>` : ''}
+    ${p.buffs?.length || p.weapon ? `<span class="gear">${(b => b ? `<span class="buff ${b.short ? 'txt' : ''}">${b.short ? `<b>${b.short}</b>` : `<img src="${GADGET(b.img)}" alt="">`}${p.buffs.length > 1 ? `<em>×${p.buffs.length}</em>` : ''}</span>` : '<i></i>')(p.buffs?.[0])}${p.weapon ? `<span class="buff wep"><img src="${p.weapon.src}" alt=""></span>` : ''}</span>` : ''}
     <span class="plate">${nameEl(p.name)}</span>
   </button>${statBlock(p)}`;
 }
