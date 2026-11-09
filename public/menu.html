@@ -69,6 +69,7 @@
   .btn.big { height: auto; min-height: 3.4rem; padding: .5rem 1rem; flex-direction: column; gap: .25rem; font-size: 1.1rem; letter-spacing: .2em; }
   .btn.warn { border-color: var(--accent); color: var(--accent); }
   .btn.danger { border-color: var(--danger); color: var(--danger); }
+  .quitNote { color: var(--danger); font-size: .86rem; text-align: center; }
   .btn small { font-weight: 500; letter-spacing: .06em; font-size: .78rem; opacity: .8; }
   .row { display: flex; gap: .6rem; }
   .row > .btn { flex: 1; }
@@ -168,7 +169,8 @@
     <div class="last" id="last" hidden></div>
     <div class="rank" id="rank"></div>
     <button class="btn go big" id="playBtn"></button>
-    <div class="row"><button class="btn" id="setBtn">SETTINGS</button></div>
+    <div class="row" id="homeRow"></div>
+    <div class="quitNote" id="quitNote" hidden></div>
   </section>
 
   <!-- Mode select -->
@@ -193,7 +195,7 @@
         <div class="seg" id="fsSeg"><button data-fs="1">ON</button><button data-fs="0">OFF</button></div></div>
       <div class="line"><div class="lbl"><span>NAME</span><small id="acctName"></small></div>
         <button class="btn" id="nameBtn">CHANGE</button></div>
-      <div class="line"><div class="lbl"><span>START OVER</span><small id="resetInfo"></small></div>
+      <div class="line"><div class="lbl"><span>RESET RANK</span><small id="resetInfo"></small></div>
         <div class="row" id="resetBtns"></div></div>
     </div>
     <div class="row"><button class="btn" data-back>BACK</button></div>
@@ -227,6 +229,7 @@ let over = get('battler.over'); try { localStorage.removeItem('battler.over'); }
 const VIEWS = ['vLogin', 'vHome', 'vModes', 'vSettings'];
 function show(v) {
   if (v !== 'vSettings') confirming = false;
+  if (v !== 'vHome') quitting = false;
   VIEWS.forEach(id => $(id).hidden = id !== v);
   ({ vLogin: renderLogin, vHome: renderHome, vSettings: renderSettings })[v]?.();
   const first = $(v).querySelector('input, .btn.go, .mbtn, .seg button');
@@ -258,7 +261,7 @@ function renderHome() {
   $('who').textContent = u.name; $('whoKind').textContent = u.kind === 'guest' ? 'GUEST' : '';
   $('last').hidden = !over;
   if (over) {
-    $('last').className = 'last' + (/^RUN OVER/.test(over.text) ? ' lost' : '');
+    $('last').className = 'last' + (/^RUN (OVER|QUIT)/.test(over.text) ? ' lost' : '');
     $('last').innerHTML = esc(over.text) + (over.delta != null ? ` · <span class="${over.delta >= 0 ? 'plus' : 'minus'}">${over.delta >= 0 ? '+' : ''}${over.delta} RP</span>` : '');
   }
   $('rank').innerHTML = rankHTML(loadProfile().rp);
@@ -266,10 +269,32 @@ function renderHome() {
   $('playBtn').innerHTML = run
     ? `CONTINUE <small>${run.mode === 'ranked' ? 'RANKED' : 'CASUAL'} · DAY ${run.round} · ${run.wins}-${run.losses} · ♥${run.hp ?? 10}</small>`
     : 'PLAY';
+  // Quit asks once, in place, saying what it costs
+  $('quitNote').hidden = !quitting;
+  if (quitting) $('quitNote').textContent = run?.mode === 'ranked'
+    ? `End this run? It counts as finished at ${run.wins} wins for RP.` : "End this run? It can't be undone.";
+  $('homeRow').innerHTML = quitting
+    ? '<button class="btn" id="quitNo">CANCEL</button><button class="btn danger" id="quitYes">QUIT RUN</button>'
+    : `<button class="btn" id="setBtn">SETTINGS</button>${run ? '<button class="btn danger" id="quitBtn">QUIT RUN</button>' : ''}`;
+}
+let quitting = false;
+// Ends the run in progress. Ranked runs are scored like any finished run (no free escape from a bad one).
+function quitRun() {
+  const run = currentRun(); quitting = false;
+  if (!run) return renderHome();
+  let delta = null;
+  if (run.mode === 'ranked') {
+    const P = loadProfile(), before = P.rp;
+    P.rp = Math.max(RP_FLOOR, P.rp + rpDelta(run.wins, P.rp)); delta = P.rp - before;
+    P.peak = Math.max(P.peak, P.rp); P.runs++; saveProfile(P);
+  }
+  ['battler.save', 'battler.run', 'battler.result', 'battler.phase', 'battler.prog'].forEach(k => { try { localStorage.removeItem(k); } catch {} });
+  over = { text: `RUN QUIT · ${run.wins}-${run.losses}`, delta };
+  renderHome(); SYNC.backup();
 }
 
 /* ---------- Settings ---------- */
-let confirming = false; // START OVER asks once, saying what goes
+let confirming = false; // RESET RANK asks once
 function renderSettings() {
   const s = settings();
   document.querySelectorAll('.seg[data-set]').forEach(g => g.querySelectorAll('button').forEach(b =>
@@ -277,11 +302,8 @@ function renderSettings() {
   $('fsLine').hidden = !document.documentElement.requestFullscreen; // e.g. iPhone Safari
   $('fsSeg').querySelectorAll('button').forEach(b => b.classList.toggle('on', (b.dataset.fs === '1') === !!document.fullscreenElement));
   const u = AUTH.user(); $('acctName').textContent = u ? `${u.name}${u.kind === 'guest' ? ' · guest' : ''}` : '';
-  const run = currentRun();
   $('resetInfo').className = confirming ? 'bad' : '';
-  $('resetInfo').textContent = confirming
-    ? `${run ? 'Run and rank' : 'Rank'} will be lost. Sure?`
-    : run ? 'Ends your run, resets rank' : 'Resets rank to Silver V';
+  $('resetInfo').textContent = confirming ? 'Rank goes back to Silver V. Sure?' : 'Back to Silver V';
   $('resetBtns').innerHTML = confirming
     ? '<button class="btn" id="resetNo">CANCEL</button><button class="btn danger" id="resetYes">YES</button>'
     : '<button class="btn danger" id="resetBtn">RESET</button>';
@@ -293,11 +315,10 @@ async function setFullscreen(on) {
   } catch {}
   renderSettings();
 }
-// Clears the run in progress and the rank. Keeps the name and settings.
+// Rank back to the start. The run in progress, name and settings stay.
 function resetProgress() {
-  ['battler.save', 'battler.run', 'battler.result', 'battler.phase', 'battler.prog', 'battler.over', 'battler.profile']
-    .forEach(k => { try { localStorage.removeItem(k); } catch {} });
-  over = null; confirming = false; toast('Started over'); show('vHome');
+  try { localStorage.removeItem('battler.profile'); } catch {}
+  confirming = false; toast('Rank reset'); show('vHome'); SYNC.backup();
 }
 
 /* ---------- Input ---------- */
@@ -307,6 +328,9 @@ document.addEventListener('click', async e => {
   if (t.dataset.provider) { try { await AUTH.signIn(t.dataset.provider); show('vHome'); } catch (err) { toast(err.message, true); } return; }
   if (t.id === 'playBtn') return currentRun() ? location.replace('prep.html') : show('vModes');
   if (t.id === 'setBtn') return show('vSettings');
+  if (t.id === 'quitBtn') { quitting = true; return renderHome(); }
+  if (t.id === 'quitNo') { quitting = false; return renderHome(); }
+  if (t.id === 'quitYes') return quitRun();
   if (t.dataset.back !== undefined) return show('vHome');
   if (t.dataset.mode) {
     try { localStorage.setItem('battler.start', t.dataset.mode); } catch {}
