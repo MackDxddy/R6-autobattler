@@ -566,34 +566,29 @@ function setMag(id, frac, ms = 120) {
   i.style.transition = `height ${ms}ms linear, background .2s`; i.style.height = frac * 100 + '%';
   b.classList.toggle('low', frac <= .25);
 }
-// A burst plays out over its whole time in the round (pace = playback ms per round ms), one tracer per round fired,
-// so a trigger pull reads as a steady stream instead of a flash followed by a long wait.
+// A burst plays out over its whole time in the round (pace = playback ms per round ms). One tracer per shot the fight
+// rolled: a hit tracer lands and takes its damage off right then, a miss sails past. Bars only ever go down here,
+// so overlapping bursts can't put health back, and nobody shoots from (or into) a dead card.
 function shot(e, pace = 1) {
   const st = tile(e.from), tt = tile(e.to), u = U(e.from), mine = u.side === 'mine';
-  const auto = !['SG', 'DMR'].includes(u.cls), per = auto ? SPRAY : 1;              // rounds per shot in the sim
-  const dur = e.b.length * (e.cad || 70) * (auto ? pace : 1);
+  const auto = !['SG', 'DMR'].includes(u.cls), n = e.b.length, dur = n * (e.cad || 70) * (auto ? pace : 1), gap = n > 1 ? dur / n : 0;
   if (e.ammo != null) setMag(e.from, e.ammo / u.mag, skipping ? 0 : Math.max(120, dur / speed));
-  if (skipping) return setHp(e.to, e.hp);
-  st.classList.add('firing'); clearTimeout(st._fr); st._fr = setTimeout(() => st.classList.remove('firing'), (dur + 300) / speed);
-  // Each shot's hit (or miss) rides on its first round; the rest of its rounds are misses
-  const plan = []; e.b.forEach((d, k) => { const n = Math.max(1, Math.round((k + 1) * per) - Math.round(k * per)); plan.push(d, ...Array(n - 1).fill(0)); });
-  const lastHit = plan.reduce((a, d, i) => d ? i : a, -1), end = plan.length - 1, gap = end ? dur / plan.length : 0;
+  if (skipping) return setHp(e.to, Math.min(HP[e.to] ?? e.hp, e.hp)), 0;
+  st.classList.add('firing'); clearTimeout(st._fr); st._fr = setTimeout(() => st.classList.remove('firing'), (dur + 250) / speed);
+  const lastHit = e.b.reduce((a, d, i) => d ? i : a, -1);
   let hp = e.hp + e.dmg;
-  plan.forEach((d, k) => setTimeout(() => {
-    if (skipping) return;
-    tracer(st, tt, mine, !d); spawn('flash-m', '', muzzle(st), 120); if (k % 2 === 0 || d) sfx.shot(mine);
+  e.b.forEach((d, k) => setTimeout(() => {
+    if (skipping || st.classList.contains('dead') || tt.classList.contains('dead')) return;
+    tracer(st, tt, mine, !d); spawn('flash-m', '', muzzle(st), 120); sfx.shot(mine);
     if (d) {
-      hp -= d; setHp(e.to, Math.max(hp, e.hp)); if (k < 6 || e.hs) sfx.hit(e.hs && k === lastHit);
+      hp -= d; setHp(e.to, Math.min(HP[e.to] ?? hp, Math.max(hp, e.hp)));
+      if (k < 6 || e.hs) sfx.hit(e.hs && k === lastHit);
       tt.querySelector('.em').animate([{ transform: 'none' }, { transform: 'translate(3px,-2px)' }, { transform: 'translate(-2px,1px)' }, { transform: 'none' }], { duration: 140 });
+      if (e.hs && k === lastHit && e.hp > 0) pop(tt, 'HEADSHOT', 'hs'); else if (!(e.hs && k === lastHit)) pop(tt, '-' + Math.round(d), '');
     }
-    if (k === end) {
-      setHp(e.to, e.hp);
-      if (!e.dmg) pop(tt, 'MISS', 'miss');
-      else if (!e.hs) pop(tt, '-' + e.dmg, '');
-      else if (e.hp > 0) pop(tt, 'HEADSHOT', 'hs');
-    }
+    if (k === n - 1 && !e.dmg) pop(tt, 'MISS', 'miss');
   }, k * gap / speed));
-  return end * gap; // playback ms until the last round lands
+  return (n - 1) * gap; // playback ms until the last shot lands
 }
 // The killing blow: hit-stop, burst, shake, settle
 async function kill(e, slow, big) {
@@ -612,7 +607,7 @@ async function kill(e, slow, big) {
   if (slow || big) await sleep(slow ? 350 : 450); // only the last kill and clutch kills hold the frame
 }
 function dot(e) {
-  setHp(e.id, e.hp);
+  setHp(e.id, Math.min(HP[e.id] ?? e.hp, e.hp));
   if (skipping || e.kind === 'gas') return;                  // gas just drains the bars; fire gets a small number
   pop(tile(e.id), '-' + e.dmg, 'burn');
 }
@@ -635,7 +630,7 @@ function spendIcons(ids) { (ids || []).forEach(id => tile(id)?.querySelector('.g
 function pingIcon(id) { const g = tile(id)?.querySelector('.gd'); if (!g) return; g.classList.remove('ping'); void g.offsetWidth; g.classList.add('ping'); }
 function gadget(e) {
   const u = U(e.id), t = tile(e.id), mine = u.side === 'mine';
-  (e.hits || []).forEach(h => setHp(h.id, h.hp));
+  (e.hits || []).forEach(h => setHp(h.id, Math.min(HP[h.id] ?? h.hp, h.hp)));
   if (e.marks && !e.block) e.marks.forEach(id => { const x = U(id); if (x.side !== u.side && x.rev) tile(id)?.classList.add('revealed'); });
   if (e.breach) { const r = document.querySelector(`.lines .site.${e.breach === 'mine' ? 'a' : 'b'}`); r?.classList.remove('walled'); }
   if (skipping) return spendIcons(e.spent);
@@ -656,7 +651,7 @@ async function setup(e) {
 // Opening utility (frag, claymore)
 async function util(e) {
   const ft = tile(e.from), tt = tile(e.to);
-  setHp(e.to, e.hp);
+  setHp(e.to, Math.min(HP[e.to] ?? e.hp, e.hp));
   if (skipping) return spendIcons(e.spent);
   callout(ft, e.label, U(e.from).side); sfx.shot(U(e.from).side === 'mine');
   if (e.block) { setTimeout(() => { pingIcon(e.block.id); gcall(tile(e.block.id), e.block.op, e.block.text, U(e.block.id).side, true); spendIcons(e.spent); }, 300 / speed); return; }
@@ -742,6 +737,13 @@ async function play(id) {
   await intro();
   if (!live()) return;
   await boosts(ev.filter(e => e.t === 'note'));
+  // The sim logs a kill when the shooter's burst ends; playback shows the burst faster, so move each kill
+  // right after the shot that caused it (the player drops on the last tracer, not seconds later)
+  for (let i = 0; i < ev.length; i++) {
+    const e = ev[i]; if (e.t !== 'shot' || e.hp > 0) continue;
+    const j = ev.findIndex((x, k) => k > i && x.t === 'kill' && x.victim === e.to);
+    if (j > i + 1) ev.splice(i + 1, 0, { ...ev.splice(j, 1)[0], at: e.at });
+  }
   let clutch = false, now = 0, fired = false;
   const PACE = 4.26; // real playback ms per sim ms: sized so the average round runs ~30s at 1x (bursts keep their real fire rate)
   for (let i = 0; i < ev.length; i++) {
