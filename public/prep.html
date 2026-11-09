@@ -137,6 +137,7 @@
   .ghost .pad { width: 2.3rem; height: calc(var(--tw) / .76); border: 1px dashed hsl(0 50% 35%); border-radius: 2px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .3rem;
     color: var(--danger); overflow: hidden; }
   .ghost .pad b { font-size: 1.1rem; }
+  .ghost.open .zl { visibility: visible; } .ghost.open .pad { width: var(--tw); border-color: var(--border); color: var(--muted); } .ghost.open .pad b { font-size: 1.6rem; font-weight: 400; }
   .ghost .pad span { writing-mode: vertical-rl; transform: rotate(180deg); font-size: .86rem; font-weight: 700; letter-spacing: .1em; white-space: nowrap; }
   .team.moving .zg { outline: 1px dashed var(--primary); outline-offset: 1px; background: hsl(140 70% 55% / .07); }
 
@@ -629,7 +630,8 @@ const TYPES = {
   DMR: { name: 'Marksman',       reload: 2.6, best: 'More headshots. Best at range' },
   SG:  { name: 'Shotgun',        reload: 3.0, best: 'Best at Entry and Anchor. Weak at range' },
 };
-const gunOf = p => p.weapon?.name || OP_GUN[p.op] || null;
+const BASE_GUN = 'MP5'; // what a player with no op and no bought gun carries (same as battle.html)
+const gunOf = p => p.weapon?.name || OP_GUN[p.op] || BASE_GUN;
 const gunItem = n => ({ id: 'gun:' + n, name: n, gun: true, cost: 3, src: GUN_SRC(n) });
 const gunLine = n => { const [t, , , m] = WEAPONS[n], g = gameGun(n); return `${TYPES[t].name} · <b>${g.dmg}</b> dmg · <b>${g.rpm}</b> rpm · <b>${m}</b> mag · <b>${TYPES[t].reload.toFixed(1)}s</b> reload`; };
 // Attachments stay on the gun they're bought for, one of each; a new gun (or a new op's gun) comes bare.
@@ -862,11 +864,14 @@ function render() {
   const ghosts = groups.filter(g => !g.ps.length).length;
   const nActive = active().length;
   const gapsW = (groups.length - 1) * .9 + groups.length * .3 + groups.reduce((a, g) => a + Math.max(0, g.ps.length - 1) * .45, 0);
-  const vars = `--cols:${nActive};--gapsW:${gapsW + ghosts * 2.6}rem`;
+  const empty = !nActive; // new run: show the five lanes as open slots to drop players into
+  const vars = empty ? `--cols:5;--gapsW:${gapsW}rem` : `--cols:${nActive};--gapsW:${gapsW + ghosts * 2.6}rem`;
   const teamEl = $('team');
   teamEl.classList.toggle('moving', moving);
   teamEl.classList.toggle('focus', S.sel?.type === 'syn');
   teamEl.innerHTML = groups.map(g => {
+    if (empty) return `<div class="zg ghost open" style="${vars}" data-zone="${g.z}" data-lane="${g.z}">
+        <span class="zl"><span class="zn">${g.z.toUpperCase()}${modMark(g.z)}</span></span><span class="pad"><b>+</b></span></div>`;
     if (!g.ps.length) return `<div class="zg ghost" style="${vars}" data-zone="${g.z}" data-lane="${g.z}">
         <span class="zl" aria-hidden="true"><span class="zn">&nbsp;</span><b class="zp">&nbsp;</b></span>
         <span class="pad"><b>⚠</b><span class="zn">${g.z.toUpperCase()}</span></span></div>`;
@@ -1329,11 +1334,13 @@ document.addEventListener('click', e => {
   if (t.id === 'freezeBtn') { S.frozen = !S.frozen; return render(); }
   if (t.id === 'readyBtn') {
     if (S.offer) return showDrop();
+    if (!active().length) return toast('Put a player on the team first', true);
     // Hand the locked-in board to the battle screen
     const team = active().map(p => ({ pid: p.id, mastery: p.mastery || 0, name: p.name, rarity: p.rarity, op: p.op, lvl: p.op ? p.lvl || 1 : 1, zone: p.zone, pow: power(p, p.zone, inLane(p.zone).indexOf(p)), passives: p.passives, role: p.role, rp: p.rp, buff: p.buff && { name: p.buff.name }, weapon: p.weapon && { name: p.weapon.name }, att: p.att, gear: p.gear.map(x => ({ id: x.id, n: x.n })) }));
     S.players.forEach(p => { p.buff = null; }); // utility is spent; guns stay
     const duos = Object.fromEntries(DUOS.filter(duoLive).map(d => [d.id, S.duos[d.id] || 0]));
-    try { localStorage.setItem('battler.run', JSON.stringify({ round: S.round, wins: S.wins, losses: S.losses, hp: S.hp, endless: !!S.endless, team, ghost: ghostFor(S.round), duos, trinkets: S.trinkets || [] }));
+    const ghost = ghostFor(S.round);
+    try { localStorage.setItem('battler.run', JSON.stringify({ round: S.round, wins: S.wins, losses: S.losses, hp: S.hp, endless: !!S.endless, team, ghost, duos, trinkets: S.trinkets || [] }));
           localStorage.setItem('battler.save', JSON.stringify({ ...S, sel: null, flash: null, lvlup: null })); } catch {}
     try { localStorage.setItem('battler.phase', 'battle'); localStorage.removeItem('battler.prog'); } catch {}
     location.replace('battle.html?t=' + Date.now()); // fresh copy every time (no stale cache)
@@ -1343,21 +1350,11 @@ document.addEventListener('click', e => {
 window.addEventListener('resize', () => { sizeRail(); fitNames(); renderPop(); });
 
 
-// A new run starts with five random commons from the pool, one per lane, each on an op for that lane
-// (one of their own mains when it fits). No bench, no spare ops: the shop builds the rest.
-function starterTeam() {
-  const pick = a => a[Math.floor(Math.random() * a.length)];
-  const commons = POOL.filter(p => p.rarity === 'common'), used = new Set(), ops = new Set();
-  return ZONES.map(({ id: zone }) => {
-    let p; do p = pick(commons.length >= 5 ? commons : POOL); while (used.has(p.name)); used.add(p.name);
-    const fits = p.mains.filter(o => OPS[o]?.[1] === zone && !ops.has(o));
-    const op = fits[0] || pick(Object.keys(OPS).filter(o => OPS[o][1] === zone && !ops.has(o))); ops.add(op);
-    return { ...p, id: p.id + Math.random().toString(36).slice(2, 6), zone, op, lvl: 1, mastery: 0, buff: null, weapon: null, att: [], gear: [] };
-  });
-}
 // Stand-in opponent until real ghosts (other players' saved boards) exist: a team that looks like what a
-// player would have on this day. Starts as five commons like yours; one player is upgraded every 2 days
-// (at that day's shop odds), about one gear piece a day, op levels and utility come in slowly.
+// player would have on this day. Runs start empty, so it has 3 commons on day 1, 4 on day 2 and 5 from
+// day 3. Ops come in about as fast as a player can buy them: none on day 1, 2 on day 2, 3 on day 3, all
+// 5 by day 4. One player is upgraded every 2 days (at that day's shop odds), about one gear piece a day;
+// op levels and utility come in slowly.
 let GHOST_TUNE = { upEvery: 2, gearPerDay: .8, lvl2: .03, lvl3: .01, buff: .05 }; // per day: share of op upgrades, utility chance
 function ghostFor(day) {
   const T = GHOST_TUNE, pick = a => a[Math.floor(Math.random() * a.length)];
@@ -1365,10 +1362,13 @@ function ghostFor(day) {
     while (k < 3 && roll >= odds[k]) roll -= odds[k++];
     for (; k >= 0; k--) { const got = list.filter(x => (x[key] || 'common') === RARITIES[k]); if (got.length) return pick(got); }
     return pick(list); };
-  const ups = new Set([0, 1, 2, 3, 4].sort(() => Math.random() - .5).slice(0, Math.floor((day - 1) / T.upEvery)));
+  const size = Math.min(5, 2 + day), slots = () => [...Array(size).keys()].sort(() => Math.random() - .5);
+  const ups = new Set(slots().slice(0, Math.floor((day - 1) / T.upEvery))), withOp = new Set(slots().slice(0, Math.round(1.5 * (day - 1))));
   const commons = POOL.filter(p => p.rarity === 'common'), used = new Set(S.players.map(p => p.name)), ops = new Set(); // never your own players
-  const team = ZONES.map(({ id: zone }, i) => {
+  const zones = ZONES.map(z => z.id).sort(() => Math.random() - .5).slice(0, size);
+  const team = zones.map((zone, i) => {
     let p; do p = ups.has(i) ? rare(POOL, 'rarity') : pick(commons.length >= 5 ? commons : POOL); while (used.has(p.name)); used.add(p.name);
+    if (!withOp.has(i)) return { ...p, zone, op: null, lvl: 1, gear: [], buff: null };
     const fits = p.mains.filter(o => OPS[o]?.[1] === zone && !ops.has(o));
     const op = fits[0] || pick(Object.keys(OPS).filter(o => OPS[o][1] === zone && !ops.has(o))); ops.add(op);
     const r = Math.random(), l3 = Math.max(0, T.lvl3 * (day - 6)), l2 = Math.min(.5, Math.max(0, T.lvl2 * (day - 2)));
@@ -1384,7 +1384,7 @@ function ghostFor(day) {
     role: p.role, rp: p.rp, buff: p.buff, weapon: null, att: [], gear: p.gear }));
 }
 function startRun(mode) {
-  S.players = starterTeam(); S.slots = [null, null, null, null, null, null];
+  S.players = []; S.slots = [null, null, null, null, null, null];
   Object.assign(S, { mode, round: 1, wins: 0, losses: 0, hp: LIVES, credits: incomeFor(1), streak: 0, investN: 0, endless: false, duos: {}, trinkets: [], offer: null, freeRerollUsed: false, frozen: false, sel: null });
   rollShop(); render();
 }

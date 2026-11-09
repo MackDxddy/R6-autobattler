@@ -1,7 +1,7 @@
 // Service worker: lets the game install as an app and run offline.
 // Pages and scripts: network first, so updates show up as soon as you're online; the cache covers offline.
 // Images and icons: cache first (they rarely change). Bump VERSION to force everything to refresh.
-const VERSION = 'v7';
+const VERSION = 'v8';
 const CACHE = `battler-${VERSION}`;
 const CORE = [
   'menu.html', 'prep.html', 'battle.html', 'rarity.js', 'pool.js', 'profile.js', 'auth.js', 'turn.js', 'manifest.webmanifest',
