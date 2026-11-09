@@ -321,6 +321,7 @@
   @media (max-height: 360px) { .shopbar { height: 5.9rem; } .tile .gear { display: none; } /* cards are short here: the gun shows when you tap the player */ .shop { gap: .2rem; }
     .shop .card { padding: .05rem .25rem; gap: 0; } .shop .card .art { padding-top: 0; } .shop .card .rtg { font-size: 1rem; }
     .shop .card .nm { font-size: 12px; } .price, .card .own { font-size: 12px; top: .05rem; }
+    .shop .card .art:has(.attx) { display: none; } /* text art repeats the name below and has no room here */
     .tools { gap: .2rem; } .tool { gap: 0; min-height: 0; overflow: hidden; } .tool svg.i { font-size: 1rem; } }
   /* Narrow phones: smaller bench/op slots, card stats in two columns so they're no wider than the card,
      and no gun row (cards are too small; the gun shows when you tap the player) */
@@ -839,7 +840,7 @@ function render() {
     if (c.kind === 'op') {
       const ml = mergeLevel(c.op), badge = ml ? `<span class="badge">L${ml}!</span>` : '', fans = fansOf(c.op);
       // Someone on your team mains it: the name line says who (the op's name is in the tap popup)
-      const fan = fans.length ? `<span class="plate for" title="${OPS[c.op][0]}: main op for ${esc(fans.map(f => f.name).join(', '))}">${nameEl('★' + fans[0].name + (fans.length > 1 ? ` +${fans.length - 1}` : ''))}</span>` : '';
+      const fan = fans.length ? `<span class="plate for" title="${OPS[c.op][0]}: main op for ${esc(fans.map(f => f.name).join(', '))}">${nameEl('★' + fans[0].name + (fans.length > 1 ? ` +${fans.length - 1}` : ''))}</span>` : '';
       return `<button class="${cls} ${badge ? 'up' : ''} ${fans.length ? 'fit' : ownsOp(c.op) ? 'owned' : ''}" data-buy="${i}">${price}${badge}
         <span class="art">${opIcon(c.op)}</span>${fan || `<span class="plate">${nameEl(OPS[c.op][0])}</span>`}</button>`;
     }
@@ -901,6 +902,7 @@ function sizeRail() {
 }
 
 // Shrink each name until it fits its plate; at the 12px floor, condense it horizontally instead of cutting it.
+const SHORT = matchMedia('(max-height: 360px)'); // short screens: shop cards have no room for a second name line
 function fitNames() {
   document.querySelectorAll('.nm').forEach(el => {
     el.style.fontSize = el.style.transform = el.style.whiteSpace = el.style.width = '';
@@ -911,7 +913,7 @@ function fitNames() {
     el.style.fontSize = fs + 'px';
     let w2 = el.offsetWidth;
     // Two-word names on shop cards go onto two lines rather than being squeezed hard
-    if (w2 > avail * 1.2 && el.closest('.card') && el.textContent.trim().includes(' ')) {
+    if (w2 > avail * 1.2 && el.closest('.card') && el.textContent.trim().includes(' ') && !SHORT.matches) {
       Object.assign(el.style, { whiteSpace: 'normal', width: avail + 'px', textAlign: 'center' }); w2 = el.scrollWidth;
     }
     if (w2 > avail) el.style.transform = `scaleX(${(avail / w2).toFixed(3)})`;
