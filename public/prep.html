@@ -553,20 +553,20 @@ const B_ITEMS = {
   Claymore:        { throw: 'clay',   at: 'contact', label: 'CLAYMORE', boom: 50, chance: .65, info: 'May hit the first pusher for 50. Blocked by Grim.' },
 };
 const B_GEAR = {
-  kevlar:   { name: 'Kevlar Vest',   info: '+32 HP. From the 3rd vest, also -5% RPM.' },
+  kevlar:   { name: 'Kevlar Vest',   info: '+32 HP. From the 3rd vest, also -10% RPM.' },
   plate:    { name: 'Ceramic Plate', info: '+10 armor (blocks 10 damage per bullet). -15% fire damage. -2.5% RPM.' },
-  hollow:   { name: 'Hollow Points', info: '+40% damage. Armor blocks double.' },
-  momentum: { name: 'Momentum',      info: '+30% damage per kill.' },
-  blood:    { name: 'Bloodthirst',   info: 'Heal 50 HP per kill.' },
+  hollow:   { name: 'Hollow Points', info: '+33% damage. Armor blocks double.' },
+  momentum: { name: 'Momentum',      info: '+20% damage for each kill your team gets.' },
+  blood:    { name: 'Bloodthirst',   info: 'Heals for 50% of the damage it deals.' },
   fresh:    { name: 'Fresh Mag',     info: '+20% damage on the first half of each mag.' },
-  wind:     { name: 'Second Wind',   info: 'Below 50% HP: heal 35 and +40% RPM. Once per fight.' },
+  wind:     { name: 'Second Wind',   info: 'Below 50% HP: heal 60 and +40% damage. Once per fight.' },
   revenge:  { name: 'Revenge',       info: '+35% damage for 3s when a teammate dies.' },
   spons:    { name: 'Sponsorship',   info: 'Earns credits. No combat effect.' },
-  thick:    { name: 'Thick Skin',    info: 'Takes 10% less damage, plus 4% less per hit taken (max 60%). Half as strong vs Shred.' },
-  shred:    { name: 'Shred Rounds',  info: "Hits also deal 6% of the target's max HP. Halves Thick Skin. One per player." },
-  cond:     { name: 'Conditioning',  base: 12, scale: 8,  info: '+12 HP. +8 more each battle.' },
+  thick:    { name: 'Thick Skin',    info: 'Takes 10% less damage, plus 3% less per hit taken (max 60%). Shred ignores it.' },
+  shred:    { name: 'Shred Rounds',  info: "Hits also deal 8% of the target's max HP. Ignores Thick Skin. One per player." },
+  cond:     { name: 'Conditioning',  base: 12, scale: 5,  info: '+12 HP. +5 more each battle.' },
   vet:      { name: 'Veteran',       base: 4,  scale: .75, info: '+4 damage. +3 more every 4 kills.' },
-  iron:     { name: 'Iron Wall',     base: 4,  scale: .75, info: '+4 armor. +3 more every 4 battles survived.' },
+  iron:     { name: 'Iron Wall',     base: 4,  scale: .75, info: '+4 armor, +8 HP. +3 armor every 4 battles survived.' },
 };
 
 // A player's starting numbers in battle: gear, attachments, this battle's item, op level and trinkets.
@@ -586,10 +586,10 @@ function cardStats(p) {
   const A = ARMOR[OP_ARMOR[p.op] || 2], it = mergeItems(p.buffs || []), gear = p.gear || [];
   const g = id => gear.filter(x => x.id === id).length, gn = id => gear.filter(x => x.id === id).reduce((a, x) => a + (x.n || 0), 0);
   const T = k => trkSum(S.trinkets || [], k), lvl = p.op ? p.lvl || 1 : 1, att = p.att || [];
-  const hp = A.hp + (p.passives.includes('Survivor') ? 15 : 0) + 32 * g('kevlar') + B_GEAR.cond.base * g('cond') + Math.floor(B_GEAR.cond.scale * gn('cond')) + (it.hp || 0) + T('hp');
+  const hp = A.hp + (p.passives.includes('Survivor') ? 15 : 0) + 32 * g('kevlar') + 8 * g('iron') + B_GEAR.cond.base * g('cond') + Math.floor(B_GEAR.cond.scale * gn('cond')) + (it.hp || 0) + T('hp');
   const armor = A.block + 10 * g('plate') + B_GEAR.iron.base * g('iron') + Math.floor(B_GEAR.iron.scale * gn('iron')) + (it.armor || 0) + T('armor');
-  const dmg0 = Math.round(d * (r0 ? 1 : n2 / rof) * (1 + .1 * (lvl - 1)) * (1 + .4 * g('hollow')) * (it.dmgMul || 1)) + B_GEAR.vet.base * g('vet') + Math.floor(B_GEAR.vet.scale * gn('vet'));
-  const rpm0 = Math.round((r0 ? n2 : rof) * .95 ** Math.max(0, g('kevlar') - 2) * .975 ** g('plate') * (it.rpmMul || 1));
+  const dmg0 = Math.round(d * (r0 ? 1 : n2 / rof) * (1 + .1 * (lvl - 1)) * (1 + .33 * g('hollow')) * (it.dmgMul || 1)) + B_GEAR.vet.base * g('vet') + Math.floor(B_GEAR.vet.scale * gn('vet'));
+  const rpm0 = Math.round((r0 ? n2 : rof) * .9 ** Math.max(0, g('kevlar') - 2) * .975 ** g('plate') * (it.rpmMul || 1));
   const mag0 = Math.round(mag * (1 + .5 * att.filter(a => a === 'ext').length) * (it.magMul || 1));
   return { hp, armor, dmg: Math.round(dmg0 * (1 + T('dmg') + T('banner') * (S.wins || 0))), rpm: Math.round(rpm0 * (1 + T('rpm'))), mag: Math.round(mag0 * (1 + T('mag'))) };
 }

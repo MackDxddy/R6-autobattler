@@ -42,20 +42,20 @@ const ATTACH = {
 };
 // Gear is permanent and stacks: buy as many as you like. Scaling gear grows between battles (n = stacks so far).
 const GEAR = {
-  kevlar:   { name: 'Kevlar Vest',   info: '+32 HP. From the 3rd vest, also -5% RPM.' },
+  kevlar:   { name: 'Kevlar Vest',   info: '+32 HP. From the 3rd vest, also -10% RPM.' },
   plate:    { name: 'Ceramic Plate', info: '+10 armor (blocks 10 damage per bullet). -15% fire damage. -2.5% RPM.' },
-  hollow:   { name: 'Hollow Points', info: '+40% damage. Armor blocks double.' },
-  momentum: { name: 'Momentum',      info: '+30% damage per kill.' },
-  blood:    { name: 'Bloodthirst',   info: 'Heal 50 HP per kill.' },
+  hollow:   { name: 'Hollow Points', info: '+33% damage. Armor blocks double.' },
+  momentum: { name: 'Momentum',      info: '+20% damage for each kill your team gets.' },
+  blood:    { name: 'Bloodthirst',   info: 'Heals for 50% of the damage it deals.' },
   fresh:    { name: 'Fresh Mag',     info: '+20% damage on the first half of each mag.' },
-  wind:     { name: 'Second Wind',   info: 'Below 50% HP: heal 35 and +40% RPM. Once per fight.' },
+  wind:     { name: 'Second Wind',   info: 'Below 50% HP: heal 60 and +40% damage. Once per fight.' },
   revenge:  { name: 'Revenge',       info: '+35% damage for 3s when a teammate dies.' },
   spons:    { name: 'Sponsorship',   info: 'Earns credits. No combat effect.' },
-  thick:    { name: 'Thick Skin',    info: 'Takes 10% less damage, plus 4% less per hit taken (max 60%). Half as strong vs Shred.' },
-  shred:    { name: 'Shred Rounds',  info: "Hits also deal 6% of the target's max HP. Halves Thick Skin. One per player." },
-  cond:     { name: 'Conditioning',  base: 12, scale: 8,  info: '+12 HP. +8 more each battle.' },
+  thick:    { name: 'Thick Skin',    info: 'Takes 10% less damage, plus 3% less per hit taken (max 60%). Shred ignores it.' },
+  shred:    { name: 'Shred Rounds',  info: "Hits also deal 8% of the target's max HP. Ignores Thick Skin. One per player." },
+  cond:     { name: 'Conditioning',  base: 12, scale: 5,  info: '+12 HP. +5 more each battle.' },
   vet:      { name: 'Veteran',       base: 4,  scale: .75, info: '+4 damage. +3 more every 4 kills.' },
-  iron:     { name: 'Iron Wall',     base: 4,  scale: .75, info: '+4 armor. +3 more every 4 battles survived.' },
+  iron:     { name: 'Iron Wall',     base: 4,  scale: .75, info: '+4 armor, +8 HP. +3 armor every 4 battles survived.' },
 };
 // Role passives: a shared pool per role (3 each). Prep picks one per player from their real stats; strength scales with rarity.
 // Self passives (Entry, Anchor, Flank, Roam) are full strength in their own zone and half elsewhere; team calls work from anywhere,
@@ -258,19 +258,19 @@ const through = dmg => Math.max(1, dmg - ARMOR[2].block);
 const normRpm = (dmg, rof) => rof * (TUNE.ref / (rof * through(dmg))) ** TUNE.pull;
 const FALLOFF = .2;
 // Armor soft cap: however much armor someone stacks, at least 35% of every bullet still gets through
-let ARMOR_FLOOR = .28;
+let ARMOR_FLOOR = .2;
 // Share of normal accuracy that lands. Lower = more bursts per kill, longer fights, more shooting on screen.
 let HIT_SCALE = .45;
 // The round plays back ~4x slower than it runs, so reloads and the pause to find a new target are kept short here
 // (a 2.4s rifle reload shows as ~4s on screen, not ~10s).
 let RELOAD_SCALE = .4, RETARGET = .5;
 // Balance dials (gear text in both files must match these)
-let KEV_HP = 32, PLATE_ARMOR = 10, HOLLOW_DMG = .4;
-let SKIN_BASE = .10, SKIN = .04; // Thick Skin, per copy: damage cut from the first hit, plus this much per hit taken
+let KEV_HP = 32, PLATE_ARMOR = 10, HOLLOW_DMG = .33;
+let SKIN_BASE = .10, SKIN = .03; // Thick Skin, per copy: damage cut from the first hit, plus this much per hit taken
 let HOLLOW_FLOOR = .21; // armor floor for Hollow Points bullets
 let SKIN_CAP = .6; // Thick Skin max damage cut
-let BLOOD_HEAL = 50, PLATE_BURN = .15, BURN_CAP = .9, SHRED_SKIN = .5; // Bloodthirst heal per kill; fire damage cut per plate (max); share of Thick Skin that works vs Shred bullets // Bloodthirst heal per kill; burn cut per plate
-let SHRED = .06; // Shred Rounds: share of the target's max HP added to each hit (doesn't stack)
+let MOM = 0.2, LIFESTEAL = 0.5, WIND_DMG = 0.4, BLOOD_HEAL = 50, PLATE_BURN = .15, BURN_CAP = .9, SHRED_SKIN = 0; // Momentum: damage per team kill (per copy); Bloodthirst: share of damage dealt healed (per copy); Second Wind: damage once triggered (per copy); BLOOD_HEAL is unused (old kill heal); fire damage cut per plate (max); share of Thick Skin that works vs Shred bullets (0 = Shred ignores it)
+let SHRED = .08; // Shred Rounds: share of the target's max HP added to each hit (doesn't stack)
 function statsFor(u) {
   const [armor, opGun] = OPS[u.op] || [2, 'MP5'];
   const gun = WEAPONS[u.weapon?.name] ? u.weapon.name : opGun;
@@ -278,12 +278,12 @@ function statsFor(u) {
   const na = id => attCount(u, id), has = k => u.passives?.includes(k), lvl = u.lvl || 1, A = ARMOR[armor];
   const it = mergeItems(buffsOf(u)), gear = u.gear || [];
   const g = id => gear.filter(x => x.id === id).length, gn = id => gear.filter(x => x.id === id).reduce((a, x) => a + (x.n || 0), 0);
-  const maxHp = A.hp + (has('Survivor') ? 15 : 0) + KEV_HP * g('kevlar') + GEAR.cond.base * g('cond') + Math.floor(GEAR.cond.scale * gn('cond')) + (it.hp || 0);
+  const maxHp = A.hp + (has('Survivor') ? 15 : 0) + KEV_HP * g('kevlar') + 8 * g('iron') + GEAR.cond.base * g('cond') + Math.floor(GEAR.cond.scale * gn('cond')) + (it.hp || 0);
   return {
     armor, gun, cls, maxHp, hp: maxHp,
     // Automatics keep their damage and have RPM evened out; pump and bolt guns keep their slow rate and hit harder per shot instead
     dmg: Math.round(dmg * (rof0 ? 1 : normRpm(dmg, rof) / rof) * (1 + .1 * (lvl - 1)) * (1 + HOLLOW_DMG * g('hollow')) * (it.dmgMul || 1)) + GEAR.vet.base * g('vet') + Math.floor(GEAR.vet.scale * gn('vet')),
-    rpm: Math.round((rof0 ? normRpm(dmg, rof) : rof) * .95 ** Math.max(0, g('kevlar') - 2) * .975 ** g('plate') * (it.rpmMul || 1)),
+    rpm: Math.round((rof0 ? normRpm(dmg, rof) : rof) * .9 ** Math.max(0, g('kevlar') - 2) * .975 ** g('plate') * (it.rpmMul || 1)),
     hit: Math.min(.92, .32 + (u.pow - 100) / 250 + .08 * na('comp') + .04 * na('grip') + (it.hit || 0)),       // chance each bullet lands
     hs: (.02 + (u.pow - 100) / 3000 + (has('Headhunter') ? .04 : 0)) * through(dmg) / 36 * (T.hs || 1), // per landed bullet, scaled so headshots per second even out across guns
     mag: Math.round(mag * (1 + .5 * na('ext')) * (it.magMul || 1)), reload: Math.round(T.reload * RELOAD_SCALE * (it.reloadMul || 1) * (1 - .25 * na('grip'))), att: [...(u.att || [])], acog: na('acog'),
@@ -471,9 +471,9 @@ function simulate(run, ghost) {
   });
 
   // Live numbers for this moment of the round
-  const rpmNow = (u, st) => u.rpm * (1 + call(u, 'tempo') * tk[u.side]) * (time < CONTACT_AT[u.zone] + 2000 ? 1 + my(u, 'first') : 1) * (u.adren && time < CONTACT_AT[u.zone] + 3000 ? 1 + u.adren : 1) * (st === 'early' && has(u, 'Opener') ? 1.25 : 1) * ((st === 'late' || st === 'clutch') && has(u, 'Closer') ? 1.25 : 1) * (u.winded ? 1 + .4 * u.wind : 1);
+  const rpmNow = (u, st) => u.rpm * (1 + call(u, 'tempo') * tk[u.side]) * (time < CONTACT_AT[u.zone] + 2000 ? 1 + my(u, 'first') : 1) * (u.adren && time < CONTACT_AT[u.zone] + 3000 ? 1 + u.adren : 1) * (st === 'early' && has(u, 'Opener') ? 1.25 : 1) * ((st === 'late' || st === 'clutch') && has(u, 'Closer') ? 1.25 : 1);
   const dmgNow = (u, st, tg) => u.dmg * (1 + my(u, 'lurker') * Math.min(5, Math.max(0, (time - CONTACT_AT[u.zone]) / 1000)) + my(u, 'hunter') * tk[u.side]
-      + my(u, 'pressure') * Math.min(8, u.streak) + (alive(u.side).length >= 3 ? my(u, 'lastline') : 0) + (alive(u.side).some(x => x.zone === 'Roam') ? my(u, 'pincer') : 0) + my(u, 'adapt')) * (1 + .3 * u.momentum * u.kills) * (time > OT.at ? 1 + OT.dmg * (time - OT.at) / 1000 : 1) * (TYPES[u.cls].dmg?.[RANGE[u.zone]] ?? 1) * (tg?.zone === 'Anchor' && u.siteBonus ? 1 + u.siteBonus : 1) * (u.open ? 1.1 : 1) * (1 + .08 * supports(u.side)) * (solo(u) && has(u, 'Clutch Gene') ? 1.25 : 1)
+      + my(u, 'pressure') * Math.min(8, u.streak) + (alive(u.side).length >= 3 ? my(u, 'lastline') : 0) + (alive(u.side).some(x => x.zone === 'Roam') ? my(u, 'pincer') : 0) + my(u, 'adapt')) * (1 + MOM * u.momentum * tk[u.side]) * (u.winded ? 1 + WIND_DMG * u.wind : 1) * (time > OT.at ? 1 + OT.dmg * (time - OT.at) / 1000 : 1) * (TYPES[u.cls].dmg?.[RANGE[u.zone]] ?? 1) * (tg?.zone === 'Anchor' && u.siteBonus ? 1 + u.siteBonus : 1) * (u.open ? 1.1 : 1) * (1 + .08 * supports(u.side)) * (solo(u) && has(u, 'Clutch Gene') ? 1.25 : 1)
     * (breached[other(u.side)] && u.zone === 'Entry' && st === 'early' ? 1 + WALL.breachDmg : 1)
     * (u.fresh && u.ammo > u.mag / 2 ? 1 + .2 * u.fresh : 1) * (u.revenge && time < u.revUntil ? 1 + .35 * u.revenge : 1)
     * (has(u, 'Winner') && alive(u.side).length > alive(other(u.side)).length ? 1.15 : 1); // Winner: plays from in front
@@ -512,7 +512,6 @@ function simulate(run, ghost) {
     alive(victim.side).forEach(u => { if (dist(u, killer) < 40 && rng() < .5) u.by = killer; });
     // Bloodthirst: the killer heals
     if (TS[killer.side].heal) alive(killer.side).forEach(x => { const amt = Math.min(TS[killer.side].heal, x.maxHp - x.hp); if (amt > 0) { x.hp += amt; ev.push({ t: 'heal', at: at + 250, from: x.id, to: x.id, amt, hp: x.hp }); } });
-    if (killer.blood && killer.alive) { const amt = Math.min(BLOOD_HEAL * killer.blood, killer.maxHp - killer.hp); if (amt > 0) { killer.hp += amt; ev.push({ t: 'heal', at: at + 200, from: killer.id, to: killer.id, amt, hp: killer.hp }); } }
     // Supports patch up their most hurt teammate after each kill
     ['mine', 'theirs'].forEach(s => {
       const sup = alive(s).find(x => x.zone === 'Support'); if (!sup) return;
@@ -627,9 +626,11 @@ function simulate(run, ghost) {
     if (cut) { shots = b.length; pause = 30 + rng() * 60; }
     if (dmg && !tg.fired && tg.hp - dmg > 0) tg.next = Math.min(tg.next, wakeAt);
     tg.hp -= dmg; if (dmg) { tg.by = sh; if (tg.holdArmor) { tg.block -= tg.holdArmor; tg.holdArmor = 0; } if (sh.burn && tg.hp > 0) ignite(sh, tg); }
+    const leech = sh.blood && dmg && sh.hp > 0 ? Math.min(Math.round(dmg * LIFESTEAL * sh.blood), sh.maxHp - sh.hp) : 0; // Bloodthirst: heal a share of damage dealt
     ev.push({ t: 'shot', at: time, from: sh.id, to: tg.id, b: b.map(x => x ? Math.round(x) || 1 : 0), cad: Math.round(60000 / rpm), dmg, hs, saved, hp: tg.hp });
+    if (leech > 0) { sh.hp += leech; ev.push({ t: 'heal', at: time + 40, from: sh.id, to: sh.id, amt: leech, hp: sh.hp }); }
     if (tg.wind && !tg.winded && tg.hp > 0 && tg.hp < .5 * tg.maxHp) { // Second Wind
-      tg.winded = true; const amt = Math.min(35 * tg.wind, tg.maxHp - tg.hp); tg.hp += amt; ev.push({ t: 'heal', at: time + 120, from: tg.id, to: tg.id, amt, hp: tg.hp });
+      tg.winded = true; const amt = Math.min(60 * tg.wind, tg.maxHp - tg.hp); tg.hp += amt; ev.push({ t: 'heal', at: time + 120, from: tg.id, to: tg.id, amt, hp: tg.hp });
     }
     sh.next = time + shots * 60000 / rpm * (.9 + rng() * .2) + pause;
     const used = ['SG', 'DMR'].includes(sh.cls) ? shots : Math.ceil(shots * SPRAY);

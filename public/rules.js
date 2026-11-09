@@ -83,20 +83,20 @@ const ATTACH = [
 ];
 // Gear is permanent and stacks (buy as many as you like). Scaling gear grows after every battle.
 const GEAR = [
-  { id:'kevlar', r:'common',   name:'Kevlar Vest',   gear:true, cost:3, short:'VEST',   desc:'+32 HP. From the 3rd vest, also -5% RPM.' },
+  { id:'kevlar', r:'common',   name:'Kevlar Vest',   gear:true, cost:3, short:'VEST',   desc:'+32 HP. From the 3rd vest, also -10% RPM.' },
   { id:'plate', r:'common',    name:'Ceramic Plate', gear:true, cost:3, short:'PLATE',  desc:'+10 armor (blocks 10 damage per bullet). -15% fire damage. -2.5% RPM.' },
-  { id:'hollow', r:'epic',   name:'Hollow Points', gear:true, cost:3, short:'HOLLOW', desc:'+40% damage. Armor blocks double.' },
-  { id:'momentum', r:'rare', name:'Momentum',      gear:true, cost:3, short:'MOMENT', desc:'+30% damage per kill.' },
-  { id:'blood', r:'legendary',    name:'Bloodthirst',   gear:true, cost:3, short:'BLOOD',  desc:'Heal 50 HP per kill.' },
+  { id:'hollow', r:'epic',   name:'Hollow Points', gear:true, cost:3, short:'HOLLOW', desc:'+33% damage. Armor blocks double.' },
+  { id:'momentum', r:'rare', name:'Momentum',      gear:true, cost:3, short:'MOMENT', desc:'+20% damage for each kill your team gets.' },
+  { id:'blood', r:'legendary',    name:'Bloodthirst',   gear:true, cost:3, short:'BLOOD',  desc:'Heals for 50% of the damage it deals.' },
   { id:'fresh', r:'common',    name:'Fresh Mag',     gear:true, cost:3, short:'FRESH',  desc:'+20% damage on the first half of each mag.' },
-  { id:'wind', r:'rare',     name:'Second Wind',   gear:true, cost:3, short:'WIND',   desc:'Below 50% HP: heal 35 and +40% RPM. Once per fight.' },
+  { id:'wind', r:'rare',     name:'Second Wind',   gear:true, cost:3, short:'WIND',   desc:'Below 50% HP: heal 60 and +40% damage. Once per fight.' },
   { id:'revenge', r:'common',  name:'Revenge',       gear:true, cost:3, short:'REVENGE', desc:'+35% damage for 3s when a teammate dies.' },
   { id:'spons', r:'common',    name:'Sponsorship',   gear:true, cost:3, short:'SPONSOR', scale:true, desc:'+¢1 per battle. +¢1 more every 3 battles (max ¢4).' },
-  { id:'shred', r:'epic',    name:'Shred Rounds',  gear:true, cost:3, short:'SHRED',  desc:"Hits also deal 6% of the target's max HP. Halves Thick Skin. One per player." },
-  { id:'thick', r:'common',    name:'Thick Skin',    gear:true, cost:3, short:'SKIN',   desc:'Takes 10% less damage, plus 4% less per hit taken (max 60%). Half as strong vs Shred.' },
-  { id:'cond', r:'epic',     name:'Conditioning',  gear:true, cost:3, short:'COND',   scale:true, desc:'+12 HP. +8 more each battle.' },
+  { id:'shred', r:'epic',    name:'Shred Rounds',  gear:true, cost:3, short:'SHRED',  desc:"Hits also deal 8% of the target's max HP. Ignores Thick Skin. One per player." },
+  { id:'thick', r:'common',    name:'Thick Skin',    gear:true, cost:3, short:'SKIN',   desc:'Takes 10% less damage, plus 3% less per hit taken (max 60%). Shred ignores it.' },
+  { id:'cond', r:'epic',     name:'Conditioning',  gear:true, cost:3, short:'COND',   scale:true, desc:'+12 HP. +5 more each battle.' },
   { id:'vet', r:'legendary',      name:'Veteran',       gear:true, cost:3, short:'VET',    scale:true, desc:'+4 damage. +3 more every 4 kills.' },
-  { id:'iron', r:'rare',     name:'Iron Wall',     gear:true, cost:3, short:'IRON',   scale:true, desc:'+4 armor. +3 more every 4 battles survived.' },
+  { id:'iron', r:'rare',     name:'Iron Wall',     gear:true, cost:3, short:'IRON',   scale:true, desc:'+4 armor, +8 HP. +3 armor every 4 battles survived.' },
 ];
 
 // Utility is one use per battle, each with one simple effect.
