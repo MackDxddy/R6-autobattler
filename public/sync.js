@@ -60,10 +60,21 @@ window.SYNC = (() => {
     const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), opts.ms || 8000);
     try { return await call('POST', 'ranked/' + what, body, { ...opts, signal: ctl.signal }); } finally { clearTimeout(timer); }
   }
+  // Quit a ranked run on the server. The page is usually leaving, so it's also noted in battler.quit and
+  // profile() makes sure it went through before reading the rank.
+  function quitRanked(run) {
+    try { localStorage.setItem('battler.quit', JSON.stringify(run)); } catch {}
+    ranked('quit', { run }, { keepalive: true }).catch(() => {});
+  }
   // Rank from the server (it scores ranked runs), copied into this device's profile. Returns it, or null offline.
   async function profile() {
     const u = await register(); if (!u?.token) return null;
     try {
+      const pending = get('battler.quit');
+      if (pending) {
+        try { await ranked('quit', { run: pending }); } catch (e) { if (e.status !== 404) return null; } // quitting twice is fine
+        localStorage.removeItem('battler.quit');
+      }
       const me = await call('GET', 'me');
       if (me.profile) localStorage.setItem('battler.profile', JSON.stringify({ ...get('battler.profile'), ...me.profile }));
       return me.profile;
@@ -71,5 +82,5 @@ window.SYNC = (() => {
   }
   const leaderboard = () => call('GET', 'leaderboard');
 
-  return { register, rename, backup, board, opponent, ranked, profile, leaderboard };
+  return { register, rename, backup, board, opponent, ranked, quitRanked, profile, leaderboard };
 })();

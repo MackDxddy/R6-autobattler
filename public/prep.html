@@ -1352,7 +1352,7 @@ function afterBattle(r) {
     let delta = null;
     if (S.mode === 'ranked' && S.runId) {
       if (S.rankDelta != null) delta = S.rankDelta; // scored by the server at the fight that ended it (profile already saved)
-      else SYNC.ranked('quit', { run: S.runId }, { keepalive: true }).catch(() => {}); // ended by hand (END RUN in Endless)
+      else SYNC.quitRanked(S.runId); // ended by hand (END RUN in Endless)
     }
     RUN_ENDED = true; localStorage.removeItem('battler.save');
     localStorage.setItem('battler.over', JSON.stringify({ text, delta }));
