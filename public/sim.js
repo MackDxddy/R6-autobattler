@@ -641,7 +641,10 @@ function simulate(run, ghost) {
     die(sh, tg, time + b.length * 60000 / rpm, hs);
   }
   ev.sort((a, b) => (a.at ?? -1) - (b.at ?? -1));
-  ev.push({ t: 'result', at: Math.max(time, ...ev.map(e => e.at || 0)) + 600, win: alive('mine').length > 0, left: alive('mine').length || alive('theirs').length });
+  // The round ends with the last kill: drop anything queued after it (reloads, heals) so nobody waits on them
+  const endAt = Math.max(time, ...ev.filter(e => e.t === 'kill').map(e => e.at));
+  for (let i = ev.length - 1; i >= 0; i--) if (ev[i].at > endAt && ev[i].t !== 'kill') ev.splice(i, 1);
+  ev.push({ t: 'result', at: endAt + 600, win: alive('mine').length > 0, left: alive('mine').length || alive('theirs').length });
   return { units, ev, wall, breached, trk: TRK };
 }
 globalThis.SIMCORE = { SPOTS, buffsOf, mergeItems, ARMOR, ARMOR_FLOOR, ATTACH, BASE_RPM, BLOOD_HEAL, CONTACT_AT, CROSS, DUOS, DUO_ROLES, ELECTRONIC, FALLOFF, FILL_ORDER, GADGETS, GEAR, HIT_SCALE, HOLLOW_FLOOR, HS_BONUS, ITEMS, KEV_HP, MASTERY, OPS, OT, PUSHERS, RANGE, ROLE_MULT, ROLE_PASSIVES, ROLE_ZONE, SHRED, SKIN_BASE, SKIN_CAP, SPRAY, TRAPS, TRINKETS, TRK_EVERY, TUNE, TYPES, WALL, WEAPONS, duoCast, duoStacks, duosFor, flexSubs, ghostTrinkets, hash, mastMul, mulberry32, normRpm, pct, rolePassive, simulate, statsFor, through, trkSum, trkTier };

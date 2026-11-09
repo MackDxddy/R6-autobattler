@@ -383,7 +383,6 @@ const sfx = (() => {
     heal: () => { tone('sine', 520, 780, .18, .1); tone('sine', 780, 1040, .16, .07, .08); },
     plant: () => { tone('square', 300, 200, .05, .06); noise(.04, 3000, 1, .08); },
     band: () => noise(.45, 700, .6, .2),
-    beat: () => { tone('sine', 72, 42, .14, .55); tone('sine', 72, 42, .12, .4, .18); },
     win: () => [523, 659, 784, 1047].forEach((f, i) => tone('square', f, f, .16, .1, i * .1)),
     loss: () => [392, 311, 233].forEach((f, i) => tone('triangle', f, f * .97, .3, .2, i * .17)),
     unlock: ac,
@@ -397,7 +396,7 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const opIcon = op => `<span class="op">${SVG[op] ?? ''}</span>`;
 const ZONE_IDS = ['Entry', 'Anchor', 'Flank', 'Roam', 'Support'];
-let LAST = null, SIM, speed = 1, skipping = false, runId = 0, heart = null;
+let LAST = null, SIM, speed = 1, skipping = false, runId = 0;
 // Defaults from the menu's settings (battler.settings); the buttons still change them for this fight
 try { const st = JSON.parse(localStorage.getItem('battler.settings') || '{}');
   if (st.speed === 2) { speed = 2; $('speedBtn').textContent = '▶▶ 2×'; $('speedBtn').classList.add('on'); }
@@ -424,8 +423,6 @@ function setPaused(on) {
   if (paused === on) return;
   paused = on;
   document.getAnimations().forEach(a => on ? a.pause() : a.play());   // bullets, bars, banners all freeze
-  if (on) { clearInterval(heart); heart = heart ? 'paused' : null; }
-  else if (heart === 'paused') heart = setInterval(sfx.beat, 950 / speed);
   document.body.classList.toggle('paused', on);
   const b = $('pauseBtn'); if (b) { b.textContent = on ? '▶' : '❚❚'; b.classList.toggle('on', on); }
 }
@@ -580,7 +577,7 @@ function shot(e, pace = 1) {
   const lastHit = e.b.reduce((a, d, i) => d ? i : a, -1);
   let hp = e.hp + e.dmg;
   e.b.forEach((d, k) => setTimeout(() => {
-    if (skipping || st.classList.contains('dead') || tt.classList.contains('dead')) return;
+    if (skipping || st.classList.contains('dead') || tt.classList.contains('dead') || (HP[e.from] ?? 1) <= 0) return; // nobody fires once their health hits 0
     tracer(st, tt, mine, !d); spawn('flash-m', '', muzzle(st), 120); sfx.shot(mine);
     if (d) {
       hp -= d; setHp(e.to, Math.min(HP[e.to] ?? hp, Math.max(hp, e.hp)));
@@ -723,7 +720,7 @@ async function boosts(notes) {
 
 function reload(e, pace) {
   if (skipping) return setMag(e.id, 1, 0);
-  const t = tile(e.id), ms = e.dur * pace / speed; t.classList.add('reloading');
+  const t = tile(e.id), ms = e.dur * pace / speed; if (t.classList.contains('dead')) return; t.classList.add('reloading');
   setMag(e.id, 0, 0); requestAnimationFrame(() => requestAnimationFrame(() => setMag(e.id, 1, ms))); // empty, then fills over the reload
   setTimeout(() => t.classList.remove('reloading'), ms);
 }
@@ -744,7 +741,7 @@ async function play(id) {
   for (let i = 0; i < ev.length; i++) {
     const e = ev[i]; if (e.t !== 'shot' || e.hp > 0) continue;
     const j = ev.findIndex((x, k) => k > i && x.t === 'kill' && x.victim === e.to);
-    if (j > i + 1) ev.splice(i + 1, 0, { ...ev.splice(j, 1)[0], at: e.at });
+    if (j > i) ev.splice(i + 1, 0, { ...ev.splice(j, 1)[0], at: e.at });
   }
   let clutch = false, now = 0, fired = false;
   const PACE = 4.26; // real playback ms per sim ms: sized so the average round runs ~30s at 1x (bursts keep their real fire rate)
@@ -753,7 +750,7 @@ async function play(id) {
     const e = ev[i];
     if (resume && i === resume && e.t !== 'result') skipping = false;
     CUR = i; if (e.t === 'kill' || e.t === 'result') saveProg();
-    if (e.at != null && e.at > now) { await sleep((e.at - now) * PACE * (clutch ? 1.6 : 1)); now = e.at; }
+    if (e.at != null && e.at > now) { await sleep(e.t === 'result' ? 900 : (e.at - now) * PACE * (clutch ? 1.6 : 1)); now = e.at; } // a short beat after the last kill
     if (!live()) return;
     if (e.t === 'clutch' && !clutch) $('rd').textContent = `${U(e.id).name.toUpperCase()} LAST ALIVE`;
     // Before first contact, utility and gadgets get their own beat; once guns are out they play over the fight
@@ -777,11 +774,9 @@ async function play(id) {
         solo.classList.add('solo');
         $('arena').classList.add('clutch'); $('rd').classList.add('clutch'); $('rd').textContent = `CLUTCH 1v${n}`;
         await band(`CLUTCH 1v${n}`, esc(u.name.toUpperCase()));
-        if (!skipping) { sfx.beat(); heart = setInterval(sfx.beat, 950 / speed); }
       }
     }
     if (e.t === 'result') {
-      clearInterval(heart); heart = null;
       if (!skipping) { e.win ? sfx.win() : sfx.loss(); await band(e.win ? 'ROUND WON' : 'ROUND LOST', '', e.win ? 'won' : 'lost'); }
       if (live()) showResult(e);
     }
@@ -842,7 +837,7 @@ function showResult(e) {
 }
 
 function start() {
-  setPaused(false); pausedBy = null; runId++; skipping = false; clearInterval(heart); heart = null;
+  setPaused(false); pausedBy = null; runId++; skipping = false;
   SIM = simulate(RUN, GHOST);
   $('result').hidden = true; $('band').hidden = true; $('fx').innerHTML = '';
   $('arena').classList.remove('clutch', 'ot'); $('rd').classList.remove('clutch'); $('rd').textContent = `ROUND ${RUN.round}`;
