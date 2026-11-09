@@ -116,6 +116,7 @@
   .hpb b { position: absolute; inset: 0; display: grid; place-items: center; font-size: .86rem; line-height: 1; font-weight: 700; color: var(--hi); text-shadow: 0 0 .25rem #000, 0 0 .1rem #000; }
   /* Base stats under the name: damage per bullet and RPM. Everything else is in the tap popup. */
   .stw { width: 100%; display: flex; justify-content: center; overflow: hidden; }
+  #map.tight .tile .stw { width: calc(100% + 1rem); } /* small cards: the stat line may run a little past the card edges */
   .st { display: inline-flex; gap: .3rem; letter-spacing: -.02em; white-space: nowrap; font-size: .86rem; line-height: 1.1; color: var(--muted); transform-origin: center; }
   .st span { display: inline-flex; align-items: center; gap: .08rem; } .st b { color: var(--fg, var(--hi)); font-weight: 700; }
   .st svg { width: .6rem; height: .6rem; flex: none; fill: none; stroke: currentColor; stroke-width: 2; }
@@ -209,9 +210,9 @@
   .lives i.now { animation: lifeOut 1.2s ease-out both; } .lives em { font-style: normal; font-weight: 700; color: var(--danger); margin-left: .3rem; line-height: 1.1rem; }
   @keyframes lifeOut { from { background: var(--danger); } }
   .kills { display: flex; gap: .5rem; }
-  .kp { display: grid; justify-items: center; gap: .15rem; width: 4.2rem; }
+  .kp { display: grid; justify-items: center; gap: .15rem; width: 6.4rem; }
   .kp .op { width: 2.2rem; height: 2.2rem; color: var(--primary); }
-  .kp .nmw { width: 100%; display: flex; justify-content: center; overflow: hidden; } .kp .nm { font-size: .86rem; }
+  .kp .nmw { width: 100%; display: flex; justify-content: center; overflow: hidden; padding: .12rem 0; } .kp .nm { font-size: .86rem; }
   .kp em { font-style: normal; font-size: .86rem; font-weight: 700; color: var(--muted); }
   .kp.mvp em { color: var(--accent); } .kp.mvp .op { filter: drop-shadow(0 0 .6rem hsl(36 90% 55% / .6)); }
   .kp.dead .op { opacity: .4; }
@@ -643,6 +644,8 @@ function gcall(el, op, text, side, bad) {
   if (skipping || !el) return;
   const c = spawn('gcall' + (bad ? ' bad' : ''), `<i>${gadgetIcon(op)}</i>${esc(text)}`, at(el, side === 'mine' ? -.62 : .62), 1000), w = c.offsetWidth / 2 + 4, aw = $('arena').clientWidth;
   c.style.left = Math.min(Math.max(parseFloat(c.style.left), w), aw - w) + 'px';
+  const ch = c.offsetHeight, ah = $('arena').clientHeight; // stay inside the arena (it drifts up as it fades), clear of the top bar
+  c.style.top = Math.min(Math.max(parseFloat(c.style.top), ch * 1.1 + 2), ah - ch / 2 - 2) + 'px';
 }
 function spendIcons(ids) { (ids || []).forEach(id => tile(id)?.querySelector('.gd')?.classList.add('spent')); }
 function pingIcon(id) { const g = tile(id)?.querySelector('.gd'); if (!g) return; g.classList.remove('ping'); void g.offsetWidth; g.classList.add('ping'); }
@@ -887,9 +890,11 @@ function showPop(u, t) {
     ${tags.length ? `<div class="ln">${tags.map(esc).join(' · ')}</div>` : ''}`;
   pop.hidden = false;
   const w = pop.offsetWidth, h = pop.offsetHeight;
-  const sa = TURN.safe(), L = sa.left + 6, T = sa.top + 6, R = TURN.w - sa.right - 6; // clear of the camera and screen edges
+  const sa = TURN.safe(), L = sa.left + 6, T = sa.top + 6, R = TURN.w - sa.right - 6, B = TURN.h - sa.bottom - 6; // clear of the camera and screen edges
   pop.style.left = `${Math.min(Math.max(r.left + r.width / 2 - w / 2, L), R - w)}px`;
-  pop.style.top = `${r.top - h - 8 < T ? r.bottom + 8 : r.top - h - 8}px`;
+  // above the tile, else below it, else as close as fits on screen
+  const top = r.top - h - 8 >= T ? r.top - h - 8 : r.bottom + 8 + h <= B ? r.bottom + 8 : Math.max(T, Math.min(B - h, r.top - h / 2));
+  pop.style.top = `${top}px`;
 }
 
 document.addEventListener('click', e => {
