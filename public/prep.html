@@ -280,7 +280,13 @@
     background: linear-gradient(105deg, transparent 35%, hsl(140 80% 70% / .16) 50%, transparent 65%) no-repeat;
     background-size: 250% 100%; animation: shimmer 2.8s ease-in-out infinite; }
   @keyframes shimmer { 0% { background-position: 130% 0; } 60%, 100% { background-position: -30% 0; } }
-  @media (prefers-reduced-motion: reduce) { .card.owned::before { animation: none; background-position: 50% 0; } }
+  /* an op or player that suits one of yours (main op): a gold sweep, and the label says who */
+  .card.fit::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(105deg, transparent 30%, hsl(40 95% 62% / .3) 50%, transparent 70%) no-repeat;
+    background-size: 250% 100%; animation: shimmer 2.2s ease-in-out infinite; }
+  .card.fit { border-color: var(--accent); }
+  .card .plate.for .nm { color: var(--accent); }
+  @media (prefers-reduced-motion: reduce) { .card.owned::before, .card.fit::before { animation: none; background-position: 50% 0; } }
   .card .own { position: absolute; top: .2rem; right: .25rem; display: flex; align-items: center; gap: .15rem; color: var(--accent); font-size: .86rem; font-weight: 700; }
   .card .own .op { width: 1.1rem; height: 1.1rem; }
 
@@ -827,13 +833,15 @@ function render() {
     if (c.kind === 'player') {
       const p = c.p, owned = p.mains.find(m => ownsOp(m));
       const own = owned ? `<span class="own" title="You own their main">★${opIcon(owned)}</span>` : '';
-      return `<button class="${cls} ${owned ? 'up' : ''}" style="--rc:var(--r-${p.rarity})" data-buy="${i}">${price}${own}
+      return `<button class="${cls} ${owned ? 'up fit' : ''}" style="--rc:var(--r-${p.rarity})" data-buy="${i}">${price}${own}
         <span class="art"><span class="rtg">${p.rating.toFixed(2)}</span></span><span class="plate">${nameEl(p.name)}</span></button>`;
     }
     if (c.kind === 'op') {
-      const ml = mergeLevel(c.op), badge = ml ? `<span class="badge">L${ml}!</span>` : '';
-      return `<button class="${cls} ${badge ? 'up' : ownsOp(c.op) ? 'owned' : ''}" data-buy="${i}">${price}${badge}
-        <span class="art">${opIcon(c.op)}</span><span class="plate">${nameEl(OPS[c.op][0])}</span></button>`;
+      const ml = mergeLevel(c.op), badge = ml ? `<span class="badge">L${ml}!</span>` : '', fans = fansOf(c.op);
+      // Someone on your team mains it: the name line says who (the op's name is in the tap popup)
+      const fan = fans.length ? `<span class="plate for" title="${OPS[c.op][0]}: main op for ${esc(fans.map(f => f.name).join(', '))}">${nameEl('★' + fans[0].name + (fans.length > 1 ? ` +${fans.length - 1}` : ''))}</span>` : '';
+      return `<button class="${cls} ${badge ? 'up' : ''} ${fans.length ? 'fit' : ownsOp(c.op) ? 'owned' : ''}" data-buy="${i}">${price}${badge}
+        <span class="art">${opIcon(c.op)}</span>${fan || `<span class="plate">${nameEl(OPS[c.op][0])}</span>`}</button>`;
     }
     return `<button class="${cls}" ${c.item.r ? `style="--rc:var(--r-${c.item.r})"` : ''} data-buy="${i}">${price}
       <span class="art ${c.item.gun ? 'gunart' : ''}">${itemArt(c.item)}</span><span class="plate">${nameEl(c.item.name)}</span></button>`;
@@ -951,9 +959,12 @@ function renderPop() {
         `${(x => x ? `<div class="ln">Top <b>${Math.max(1, 100 - x[2])}%</b> of pros${x[4] ? ` · ${esc(x[4].slice(0, 2).join(', '))}${x[4].length > 2 ? ` +${x[4].length - 2}` : ''}` : ''}</div>` : '')(impactOf(p.name))}` +
         `<div class="ln">${rpShort(p)}</div>` +
         tagRow(p.passives.map(k => [k, PASSIVES[k]?.[1]]), sel.tag, `mains ${p.mains.map(m => OPS[m]?.[0] ?? m).join('/')}`) +
+        ((o => o ? `<div class="ln"><b class="star">★</b> You own <b>${OPS[o][0]}</b>, one of their mains: +10% power on it.</div>` : '')(p.mains.find(m => ownsOp(m)))) +
         `<div class="acts"><button class="btn buy" data-act="buy">Buy ¢${costOf(c)}</button></div>`;
     } else if (c.kind === 'op') {
+      const fans = fansOf(c.op);
       html = row(OPS[c.op][0], `operator · ${OPS[c.op][1]}`) +
+        (fans.length ? `<div class="ln"><b class="star">★</b> Main op for <b>${fans.map(f => esc(f.name)).join(', ')}</b>: +10% power on it.</div>` : '') +
         `<div class="acts"><button class="btn buy" data-act="buy">Buy ¢${costOf(c)}</button></div>`;
     } else {
       const it = c.item;
@@ -1116,6 +1127,17 @@ function rollShop() {
   ];
 }
 
+// Two players trade places. The op, gun, attachments, gear and items stay with the spot, so a bench
+// player who comes in takes over everything the outgoing player had.
+const LOADOUT = ['op', 'lvl', 'weapon', 'att', 'gear', 'buffs'];
+function swapSpots(p, q) {
+  for (const k of LOADOUT) [p[k], q[k]] = [q[k], p[k]];
+  [p.zone, q.zone] = [q.zone, p.zone];
+  for (const x of [p, q]) if (x.zone === 'bench') x.buffs = []; // items are only for the fight
+}
+// Your players (team and bench) who main this op and aren't on it yet
+const fansOf = op => S.players.filter(p => p.mains.includes(op) && p.op !== op);
+
 function equip(p, slotIdx) {
   const incoming = S.slots[slotIdx]; // may be empty: then this just unequips
   if (!p.weapon && p.att?.length && OP_GUN[incoming?.op] !== OP_GUN[p.op]) { p.att = []; toast('New gun. Attachments removed'); } // their gun came from the op
@@ -1208,7 +1230,7 @@ function drop(d, t, rect) {
     const p = S.players.find(x => x.id === d.el.dataset.player), q = teamTile(t);
     if (t.id === 'sellZone') return sellPlayer(p);
     if (q && q.zone === p.zone) { const a = S.players.indexOf(p), b = S.players.indexOf(q); [S.players[a], S.players[b]] = [q, p]; S.flash = 'p:' + p.id; return render(); } // reorder
-    if (q) { [p.zone, q.zone] = [q.zone, p.zone]; if (p.zone === 'bench') p.buffs = []; if (q.zone === 'bench') q.buffs = []; S.flash = 'p:' + p.id; return render(); }
+    if (q) { swapSpots(p, q); S.flash = 'p:' + p.id; return render(); }
     if (t.dataset.slot !== undefined) { equip(p, +t.dataset.slot); return render(); }
     if (t.dataset.zone) {
       if (p.zone === 'bench' && active().length >= 5) { toast('Team full. Drop on a player to swap', true); return render(); }
