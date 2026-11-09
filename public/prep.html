@@ -155,24 +155,25 @@
   .tile { --rc: var(--r-common); position: relative; width: var(--tw); height: calc(var(--tw) / .76); display: flex; flex-direction: column;
     background: hsl(220 15% 13% / .95); border: 1px solid var(--border); border-top: 3px solid var(--rc); border-radius: 2px; }
   .tile.sel { border-color: var(--accent); border-top-color: var(--rc); box-shadow: 0 0 0 1px var(--accent); }
-  .tile .art { flex: 1; min-height: 0; display: grid; place-items: center; padding: max(16%, 1rem) 16% 4%; } /* top room for the level diamonds */
-  .tile .art .op, .tile .art .sil { width: 100%; height: 100%; }
+  /* The op icon stays inside its own box: below the star and level diamonds, above the gun row */
+  .tile .art { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: .95rem 6% .1rem; }
+  .tile .art .op, .tile .art .sil { height: 100%; width: auto; max-width: 100%; aspect-ratio: 1; }
   .tile .art .sil { fill: hsl(140 20% 18%); }
-  .tile .plate { padding: .15rem .15rem .4rem; display: flex; justify-content: center; overflow: hidden; }
+  .tile .plate { padding: .1rem .15rem .25rem; display: flex; justify-content: center; overflow: hidden; }
   .tcol { display: flex; flex-direction: column; align-items: center; gap: .2rem; }
   .tst { display: flex; flex-direction: column; align-items: center; gap: .05rem; font-size: 12px; line-height: 1.15; color: var(--muted); white-space: nowrap; }
   .tst > div { display: flex; gap: .45rem; }
   .tst span { display: inline-flex; align-items: center; gap: .12rem; } .tst b { color: var(--fg); font-weight: 600; }
   .tst svg { width: .62rem; height: .62rem; fill: none; stroke: currentColor; stroke-width: 1.8; }
   .nm { display: inline-block; white-space: nowrap; font-weight: 700; font-size: 1rem; line-height: 1.15; color: var(--hi); transform-origin: center; }
-  .tile .lvl { position: absolute; top: .3rem; right: .3rem; }
+  .tile .lvl { position: absolute; top: .25rem; right: .25rem; line-height: 0; }
   .tile .star { position: absolute; top: .15rem; left: .3rem; color: var(--accent); font-size: .9rem; }
   .tile .buff { position: absolute; left: .2rem; bottom: 1.9rem; width: 1.5rem; height: 1.5rem; border: 1px solid var(--accent); background: var(--bg); display: grid; place-items: center; }
   .pop .mut { color: var(--muted); } .pop .warn { color: var(--accent); }
   .tile .buff.txt { width: auto; padding: 0 .25rem; } .tile .buff.txt b { font-size: max(12px, .75rem); color: var(--accent); letter-spacing: .04em; }
   .tile .buff.wep { width: 2.4rem; }
   /* The gun gets its own row under the op icon so it never covers it (items show when you tap the player) */
-  .tile .gear { flex: none; display: flex; justify-content: center; align-items: center; gap: .2rem; padding: 0 .2rem; height: 1.45rem; }
+  .tile .gear { flex: none; display: flex; justify-content: center; align-items: center; gap: .2rem; padding: 0 .2rem; height: 1.25rem; }
   .tile .gear .buff { position: relative; left: auto; right: auto; bottom: auto; height: 100%; }
   .tile .gear .buff.wep { width: auto; flex: 0 1 2.4rem; min-width: 1.3rem; }
   .tile .gear .buff.wep img { width: 88%; }
@@ -310,7 +311,8 @@
   .tick-up { color: var(--primary) !important; } .tick-down { color: var(--danger) !important; }
 
   /* Short screens (Safari with its toolbars showing): one shop row so the board keeps its room */
-  @media (max-height: 360px) { .shopbar { height: 5.9rem; } .shop { gap: .2rem; }
+  @media (max-height: 440px) and (min-height: 361px) { .shopbar { height: 7.2rem; } }
+  @media (max-height: 360px) { .shopbar { height: 5.9rem; } .tile .gear { display: none; } /* cards are short here: the gun shows when you tap the player */ .shop { gap: .2rem; }
     .shop .card { padding: .05rem .25rem; gap: 0; } .shop .card .art { padding-top: 0; } .shop .card .rtg { font-size: 1rem; }
     .shop .card .nm { font-size: 12px; } .price, .card .own { font-size: 12px; top: .05rem; }
     .tools { gap: .2rem; } .tool { gap: 0; min-height: 0; overflow: hidden; } .tool svg.i { font-size: 1rem; } }

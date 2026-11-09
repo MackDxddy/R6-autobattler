@@ -464,19 +464,32 @@ function renderBoard() {
 // Largest tile size where no two position groups overlap and everything stays on screen
 function layout() {
   const m = $('map'), rem = parseFloat(getComputedStyle(document.documentElement).fontSize), W = m.clientWidth, H = m.clientHeight;
-  const gs = ['mine', 'theirs'].flatMap(side => ZONE_IDS.map(z => ({ x: SPOTS[side][z][0] / 100 * W, y: SPOTS[side][z][1] / 100 * H, n: inZone(side, z).length })));
+  const gs = ['mine', 'theirs'].flatMap(side => ZONE_IDS.map(z => ({ x: SPOTS[side][z][0] / 100 * W, y: SPOTS[side][z][1] / 100 * H, n: inZone(side, z).length, site: z === 'Anchor' })));
   const gap = .75 * rem, lbl = 1.25 * rem, wOf = (g, tw) => (g.n ? g.n * tw + (g.n - 1) * gap + 1.15 * rem : tw * .8) + lbl;
-  const extra = 3.45 * rem;
-  const fits = tw => gs.every((g, i) => {
-    const w = wOf(g, tw), h = tw * .8 + extra;
-    if (g.x - w / 2 < 0 || g.x + w / 2 > W || g.y - h / 2 < 0 || g.y + h / 2 > H) return false;
-    return gs.every((o, j) => j <= i || Math.abs(g.x - o.x) >= (w + wOf(o, tw)) / 2 + .5 * rem || Math.abs(g.y - o.y) >= h + .3 * rem);
-  });
+  const extra = 3.45 * rem, pad = .45 * rem, slbl = 1.35 * rem;
+  // Each group's box; an Anchor group also holds its site box and the SITE label above it
+  const box = (g, tw) => { const w = wOf(g, tw) / 2, h = (tw * .8 + extra) / 2, p = g.site ? pad : 0;
+    return { l: g.x - w - p, r: g.x + w + p, t: g.y - h - p - (g.site ? slbl : 0), b: g.y + h + p }; };
+  const fits = tw => { const bs = gs.map(g => box(g, tw));
+    return bs.every((a, i) => a.l >= 0 && a.r <= W && a.t >= 0 && a.b <= H &&
+      bs.every((o, j) => j <= i || a.r + .4 * rem <= o.l || o.r + .4 * rem <= a.l || a.b + .3 * rem <= o.t || o.b + .3 * rem <= a.t)); };
   const size = () => { let tw = 7.5 * rem; while (tw > 36 && !fits(tw)) tw -= 2; return tw; };
   const tw = size();
   m.classList.toggle('tight', tw < 5.4 * rem);
   m.style.setProperty('--tw', tw + 'px');
   fitNames();
+  // Site boxes hug the Anchor groups, with the label just above
+  const mr = m.getBoundingClientRect(), pad2 = .45 * rem, SB = {};
+  [['mine', 'a'], ['theirs', 'b']].forEach(([side, k]) => {
+    const g = m.querySelector(`.grp[data-side="${side}"][data-zone="Anchor"]`), r = m.querySelector(`.lines .site.${k}`), l = m.querySelector(`.slbl.${k}`);
+    if (!g || !r) return; const b = g.getBoundingClientRect();
+    const x = (b.left - mr.left - pad2) / W * 100, y = (b.top - mr.top - pad2) / H * 100;
+    r.setAttribute('x', x); r.setAttribute('y', y); r.setAttribute('width', (b.width + 2 * pad2) / W * 100); r.setAttribute('height', (b.height + 2 * pad2) / H * 100);
+    if (l) { l.style.left = (b.left - mr.left + b.width / 2) / W * 100 + '%'; l.style.top = `calc(${y}% - 1.3rem)`; }
+    SB[k] = { t: y, b: y + (b.height + 2 * pad2) / H * 100, l: x, r: x + (b.width + 2 * pad2) / W * 100 };
+  });
+  const S2 = SB.a && SB.b, path = m.querySelector('.lines .route');
+  if (S2 && path) path.setAttribute('d', `M16 ${SB.a.t} V17 H84 V${SB.b.t} M16 ${SB.a.b} V83 H84 V${SB.b.b} M${SB.a.r} 50 H${SB.b.l}`);
 }
 
 function score() {
