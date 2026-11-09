@@ -7,7 +7,8 @@ Title data from [Liquipedia](https://liquipedia.net/rainbowsix) (CC-BY-SA 3.0).
 - `public/` - the game (static files). This folder is what gets published. Start page: `menu.html`.
 - `tools/` - build scripts (Python). Run from the repo root, e.g. `python tools/build_pool.py`.
 - `data/` - inputs for the build scripts. Never published.
-- `functions/` - Cloudflare Pages Functions. For now just a block on private paths (see public/_routes.json).
+- `functions/` - Cloudflare Pages Functions: `api/` (guest players, run backups, boards; D1 bound as `DB`) and a 404 for private paths.
+- `migrations/` - database schema (D1 `r6-autobattler`).
 
 ## Run locally
     python -m http.server 8080 --directory public

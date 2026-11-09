@@ -1,5 +1,13 @@
 {
   "version": 1,
-  "include": ["/data/*", "/tools/*", "/functions/*", "/README.md", "/wrangler.jsonc", "/.gitignore"],
+  "include": [
+    "/api/*",
+    "/data/*",
+    "/tools/*",
+    "/functions/*",
+    "/README.md",
+    "/wrangler.jsonc",
+    "/.gitignore"
+  ],
   "exclude": []
 }

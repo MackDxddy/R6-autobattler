@@ -353,6 +353,7 @@
 
 <script src="rarity.js"></script>
 <script src="profile.js"></script>
+<script src="sync.js"></script>
 <script src="pool.js"></script>
 <script>
 // One run per account (the browser stands in for the account until there are logins).
@@ -1344,6 +1345,7 @@ document.addEventListener('click', e => {
     try { localStorage.setItem('battler.run', JSON.stringify({ round: S.round, wins: S.wins, losses: S.losses, hp: S.hp, endless: !!S.endless, team, ghost, duos, trinkets: S.trinkets || [] }));
           localStorage.setItem('battler.save', JSON.stringify({ ...S, sel: null, flash: null, lvlup: null })); } catch {}
     try { localStorage.setItem('battler.phase', 'battle'); localStorage.removeItem('battler.prog'); } catch {}
+    SYNC.board({ mode: S.mode, round: S.round, wins: S.wins, losses: S.losses, team }); // future ghost for other players
     location.replace('battle.html?t=' + Date.now()); // fresh copy every time (no stale cache)
     return;
   }
@@ -1485,6 +1487,7 @@ if (!S.mode) {
   else { RUN_ENDED = true; location.replace('menu.html'); throw new Error('to the menu'); }
 } else if (S.offer) showDrop();
 if (S.pendingToast) { toast(S.pendingToast); S.pendingToast = null; }
+saveRun(); SYNC.backup(); // back up the run (with this fight's result applied) on the server
 Promise.all(Object.keys(OPS).map(k => fetch(`ops/${k}.svg`).then(r => r.text())
   .then(t => SVG[k] = t.replace(/<switch>[\s\S]*?<\/foreignObject>/, '').replace('</switch>', ''))
   .catch(() => {}))).then(render);

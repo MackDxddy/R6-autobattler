@@ -1,10 +1,10 @@
 // Service worker: lets the game install as an app and run offline.
 // Pages and scripts: network first, so updates show up as soon as you're online; the cache covers offline.
 // Images and icons: cache first (they rarely change). Bump VERSION to force everything to refresh.
-const VERSION = 'v10';
+const VERSION = 'v11';
 const CACHE = `battler-${VERSION}`;
 const CORE = [
-  'menu.html', 'prep.html', 'battle.html', 'rarity.js', 'pool.js', 'profile.js', 'auth.js', 'turn.js', 'nav.js', 'manifest.webmanifest',
+  'menu.html', 'prep.html', 'battle.html', 'rarity.js', 'pool.js', 'profile.js', 'auth.js', 'turn.js', 'nav.js', 'sync.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/apple-touch-icon.png',
 ];
 
@@ -34,6 +34,7 @@ self.addEventListener('fetch', e => {
   const url = new URL(req.url);
   const fonts = url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com';
   if (url.origin !== location.origin && !fonts) return;
+  if (url.pathname.startsWith('/api/')) return; // server calls always go to the network
 
   // Fonts: serve the cached copy, refresh it in the background
   if (fonts) {

@@ -3,5 +3,9 @@
 {
   "name": "r6-autobattler",
   "compatibility_date": "2025-09-01",
-  "pages_build_output_dir": "./public"
+  "pages_build_output_dir": "./public",
+  // The game's database (players, run backups, boards). Schema: migrations/
+  "d1_databases": [
+    { "binding": "DB", "database_name": "r6-autobattler", "database_id": "781a8f7a-d2b8-4c94-8591-d36502596dc6" }
+  ]
 }

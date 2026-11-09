@@ -205,6 +205,7 @@
 
 <script src="profile.js"></script>
 <script src="auth.js"></script>
+<script src="sync.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -241,6 +242,7 @@ function renderLogin() {
 function playAsGuest() {
   const err = AUTH.guest($('name').value.trim());
   if (err) { $('nameErr').textContent = err; return; }
+  SYNC.rename(AUTH.user().name); // server copy of the guest (made the first time we're online)
   show('vHome');
 }
 $('name').addEventListener('keydown', e => { if (e.key === 'Enter') playAsGuest(); });
@@ -323,6 +325,7 @@ document.addEventListener('keydown', e => {
 });
 
 show(AUTH.user() ? 'vHome' : 'vLogin');
+SYNC.register();
 </script>
 </body>
 </html>
