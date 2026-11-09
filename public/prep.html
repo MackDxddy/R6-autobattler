@@ -293,7 +293,7 @@
   @keyframes pip { 0% { transform: rotate(45deg) scale(2.2); } 100% { transform: rotate(45deg) scale(1); } }
   .tick-up { color: var(--primary) !important; } .tick-down { color: var(--danger) !important; }
 
-  @media (max-width: 760px) { .chip.rd small, .mapChip .mods { display: none; } .hud { gap: .7rem; } .dock { gap: .9rem; } }
+  @media (max-width: 760px) { .mapChip .mods { display: none; } .hud { gap: .7rem; } .dock { gap: .9rem; } }
 
   .rotate { display: none; position: fixed; inset: 0; place-items: center; text-align: center; padding: 1.5rem; }
   .rotate .ic { font-size: 3.4rem; color: var(--primary); display: inline-block; animation: tilt 2.4s ease-in-out infinite; }
@@ -319,7 +319,7 @@
     <span class="chip streak" id="streakChip" hidden></span>
     <span class="chip hp" title="Lives" id="lives"></span>
     <span class="chip win" title="Wins"><svg class="i" viewBox="0 0 24 24"><path d="M6 2h12v3h4v3a5 5 0 0 1-5 5h-.4A6 6 0 0 1 13 16.9V19h4v3H7v-3h4v-2.1A6 6 0 0 1 7.4 13H7a5 5 0 0 1-5-5V5h4zm0 5H4v1a3 3 0 0 0 2 2.8zm12 0v3.8A3 3 0 0 0 20 8V7z"/></svg><span id="wins"></span><span id="winsOf">/10</span></span>
-    <span class="chip rd"><small>ROUND</small><span id="roundNo"></span></span>
+    <span class="chip rd" title="Day of the run"><small>DAY</small><span id="roundNo"></span></span>
     <span class="chip mode" id="modeChip"></span>
     <button class="chip trkChip" id="trkBtn" title="Trinkets" hidden></button>
     <span class="grow"></span>
