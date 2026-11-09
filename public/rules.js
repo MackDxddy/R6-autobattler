@@ -77,47 +77,47 @@ const WEAPONS = {"L85A2":["AR",47,670,31],"AR33":["AR",40,749,26],"G36C":["AR",3
 // Attachments stay on the gun they're bought for, one of each; a new gun (or a new op's gun) comes bare.
 const ATTACH = [
   { id:'ext',  name:'Extended Mag', att:true, cost:2, short:'MAG',  desc:'+50% mag size.' },
-  { id:'comp', name:'Compensator',  att:true, cost:2, short:'COMP', desc:'+5% hit chance.' },
-  { id:'acog', name:'ACOG',         att:true, cost:2, short:'ACOG', desc:'+6% hit at range. -4% up close.' },
-  { id:'grip', name:'Angled Grip',  att:true, cost:2, short:'GRIP', desc:'First shot 80ms faster.' },
+  { id:'comp', name:'Compensator',  att:true, cost:2, short:'COMP', desc:'+8% hit chance.' },
+  { id:'acog', name:'ACOG',         att:true, cost:2, short:'ACOG', desc:'+10% hit at range. -2% up close.' },
+  { id:'grip', name:'Angled Grip',  att:true, cost:2, short:'GRIP', desc:'+4% hit chance. Reloads 25% faster.' },
 ];
 // Gear is permanent and stacks (buy as many as you like). Scaling gear grows after every battle.
 const GEAR = [
   { id:'kevlar', r:'common',   name:'Kevlar Vest',   gear:true, cost:3, short:'VEST',   desc:'+32 HP. From the 3rd vest, also -5% RPM.' },
   { id:'plate', r:'common',    name:'Ceramic Plate', gear:true, cost:3, short:'PLATE',  desc:'+10 armor (blocks 10 damage per bullet). -15% fire damage. -2.5% RPM.' },
   { id:'hollow', r:'epic',   name:'Hollow Points', gear:true, cost:3, short:'HOLLOW', desc:'+40% damage. Armor blocks double.' },
-  { id:'momentum', r:'rare', name:'Momentum',      gear:true, cost:3, short:'MOMENT', desc:'+15% damage per kill.' },
-  { id:'blood', r:'legendary',    name:'Bloodthirst',   gear:true, cost:3, short:'BLOOD',  desc:'Heal 30 HP per kill.' },
+  { id:'momentum', r:'rare', name:'Momentum',      gear:true, cost:3, short:'MOMENT', desc:'+30% damage per kill.' },
+  { id:'blood', r:'legendary',    name:'Bloodthirst',   gear:true, cost:3, short:'BLOOD',  desc:'Heal 50 HP per kill.' },
   { id:'fresh', r:'common',    name:'Fresh Mag',     gear:true, cost:3, short:'FRESH',  desc:'+20% damage on the first half of each mag.' },
   { id:'wind', r:'rare',     name:'Second Wind',   gear:true, cost:3, short:'WIND',   desc:'Below 50% HP: heal 35 and +40% RPM. Once per fight.' },
   { id:'revenge', r:'common',  name:'Revenge',       gear:true, cost:3, short:'REVENGE', desc:'+35% damage for 3s when a teammate dies.' },
   { id:'spons', r:'common',    name:'Sponsorship',   gear:true, cost:3, short:'SPONSOR', scale:true, desc:'+¢1 per battle. +¢1 more every 3 battles (max ¢4).' },
-  { id:'shred', r:'epic',    name:'Shred Rounds',  gear:true, cost:3, short:'SHRED',  desc:"Hits also deal 8% of the target's max HP. Halves Thick Skin. One per player." },
+  { id:'shred', r:'epic',    name:'Shred Rounds',  gear:true, cost:3, short:'SHRED',  desc:"Hits also deal 6% of the target's max HP. Halves Thick Skin. One per player." },
   { id:'thick', r:'common',    name:'Thick Skin',    gear:true, cost:3, short:'SKIN',   desc:'Takes 10% less damage, plus 4% less per hit taken (max 60%). Half as strong vs Shred.' },
   { id:'cond', r:'epic',     name:'Conditioning',  gear:true, cost:3, short:'COND',   scale:true, desc:'+12 HP. +8 more each battle.' },
-  { id:'vet', r:'legendary',      name:'Veteran',       gear:true, cost:3, short:'VET',    scale:true, desc:'+2 damage. +3 more every 4 kills.' },
-  { id:'iron', r:'rare',     name:'Iron Wall',     gear:true, cost:3, short:'IRON',   scale:true, desc:'+1 armor. +3 more every 4 battles survived.' },
+  { id:'vet', r:'legendary',      name:'Veteran',       gear:true, cost:3, short:'VET',    scale:true, desc:'+4 damage. +3 more every 4 kills.' },
+  { id:'iron', r:'rare',     name:'Iron Wall',     gear:true, cost:3, short:'IRON',   scale:true, desc:'+4 armor. +3 more every 4 battles survived.' },
 ];
 
 // Utility is one use per battle, each with one simple effect.
 const ITEMS = [
   { id:'frag', r:'common',   name:'Frag', img:'Frag_Grenade.png',          cost:2, desc:'May hit their lane player for 35. Blocked by ADS.' },
   { id:'breach', r:'rare', name:'Breach Charge', img:'R6S_Breach_charge.png', cost:2, desc:'+50% damage vs their Anchor. Blocked by Mute.' },
-  { id:'stun', r:'common',   name:'Stun', img:'Stun_Grenade.png',          cost:2, desc:'Their lane player misses more for 2s. Blocked by ADS and Warden.' },
-  { id:'smoke', r:'common',  name:'Smoke', img:'Smoke_Grenade.png',        cost:2, desc:'Enemies miss more into this lane for 3s. Blocked by ADS and Warden.' },
+  { id:'stun', r:'common',   name:'Stun', img:'Stun_Grenade.png',          cost:2, desc:'Their lane player misses more for 1.5s. Blocked by ADS and Warden.' },
+  { id:'smoke', r:'common',  name:'Smoke', img:'Smoke_Grenade.png',        cost:2, desc:'Enemies miss more into this lane for 2s. Blocked by ADS and Warden.' },
   { id:'hot', r:'rare',    name:'Hot Loads',    short:'HOT',   cost:2, desc:'+25% damage.' },
-  { id:'heavy', r:'epic',  name:'Heavy Rounds', short:'HEAVY', cost:2, desc:'+75% damage, -30% RPM.' },
-  { id:'hair', r:'rare',   name:'Hair Trigger', short:'HAIR',  cost:2, desc:'+45% RPM, -10% damage.' },
-  { id:'mags', r:'rare',   name:'Extra Mags',   short:'MAGS',  cost:2, desc:'2x mag size, 50% faster reloads.' },
+  { id:'heavy', r:'epic',  name:'Heavy Rounds', short:'HEAVY', cost:2, desc:'+65% damage, -30% RPM.' },
+  { id:'hair', r:'rare',   name:'Hair Trigger', short:'HAIR',  cost:2, desc:'+45% RPM.' },
+  { id:'mags', r:'rare',   name:'Extra Mags',   short:'MAGS',  cost:2, desc:'+60% mag size, 35% faster reloads.' },
   { id:'trauma', r:'common', name:'Trauma Plate', short:'PLATE', cost:2, desc:'+7 armor.' },
   { id:'steady', r:'common', name:'Steady Aim',   short:'AIM',   cost:2, desc:'+10% hit chance.' },
   { id:'prize', r:'common',  name:'Prize Money',  short:'PRIZE', cost:2, desc:'+¢4 if they get the most kills on your team.' },
   { id:'pain', r:'rare',   name:'Painkillers',  short:'PAIN',  cost:2, desc:'-18% damage taken.' },
-  { id:'stim', r:'common',   name:'Stim Pack',  short:'STIM',  cost:2, desc:'+35 HP.' },
-  { id:'adren', r:'rare',  name:'Adrenaline', short:'ADREN', cost:2, desc:'+40% RPM for the first 3s.' },
+  { id:'stim', r:'common',   name:'Stim Pack',  short:'STIM',  cost:2, desc:'+50 HP.' },
+  { id:'adren', r:'rare',  name:'Adrenaline', short:'ADREN', cost:2, desc:'+60% RPM for the first 3s.' },
   { id:'ap', r:'epic',     name:'AP Rounds',  short:'AP',    cost:2, desc:'Bullets ignore armor.' },
-  { id:'fire', r:'epic',   name:'Incendiary', short:'FIRE',  cost:2, desc:'Hits burn 3% max HP per second for 2s.' },
-  { id:'clay', r:'common',   name:'Claymore', img:'Claymore.png',          cost:2, desc:'May hit the first pusher for 35. Blocked by Grim.' },
+  { id:'fire', r:'epic',   name:'Incendiary', short:'FIRE',  cost:2, desc:'Hits burn 10% max HP per second for 2s.' },
+  { id:'clay', r:'common',   name:'Claymore', img:'Claymore.png',          cost:2, desc:'May hit the first pusher for 50. Blocked by Grim.' },
 ];
 
 function power(p, zone, idxInZone) {

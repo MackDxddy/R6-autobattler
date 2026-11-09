@@ -36,26 +36,26 @@ const TYPES = {
 // Attachments stay on the gun they were bought for; a new gun comes bare. One of each.
 const ATTACH = {
   ext:  { name: 'Extended Mag', info: '+50% mag size.' },
-  comp: { name: 'Compensator',  info: '+5% hit chance.' },
-  acog: { name: 'ACOG',         info: '+6% hit at range. -4% up close.' },
-  grip: { name: 'Angled Grip',  info: 'First shot 80ms faster.' },
+  comp: { name: 'Compensator',  info: '+8% hit chance.' },
+  acog: { name: 'ACOG',         info: '+10% hit at range. -2% up close.' },
+  grip: { name: 'Angled Grip',  info: '+4% hit chance. Reloads 25% faster.' },
 };
 // Gear is permanent and stacks: buy as many as you like. Scaling gear grows between battles (n = stacks so far).
 const GEAR = {
   kevlar:   { name: 'Kevlar Vest',   info: '+32 HP. From the 3rd vest, also -5% RPM.' },
   plate:    { name: 'Ceramic Plate', info: '+10 armor (blocks 10 damage per bullet). -15% fire damage. -2.5% RPM.' },
   hollow:   { name: 'Hollow Points', info: '+40% damage. Armor blocks double.' },
-  momentum: { name: 'Momentum',      info: '+15% damage per kill.' },
-  blood:    { name: 'Bloodthirst',   info: 'Heal 30 HP per kill.' },
+  momentum: { name: 'Momentum',      info: '+30% damage per kill.' },
+  blood:    { name: 'Bloodthirst',   info: 'Heal 50 HP per kill.' },
   fresh:    { name: 'Fresh Mag',     info: '+20% damage on the first half of each mag.' },
   wind:     { name: 'Second Wind',   info: 'Below 50% HP: heal 35 and +40% RPM. Once per fight.' },
   revenge:  { name: 'Revenge',       info: '+35% damage for 3s when a teammate dies.' },
   spons:    { name: 'Sponsorship',   info: 'Earns credits. No combat effect.' },
   thick:    { name: 'Thick Skin',    info: 'Takes 10% less damage, plus 4% less per hit taken (max 60%). Half as strong vs Shred.' },
-  shred:    { name: 'Shred Rounds',  info: "Hits also deal 8% of the target's max HP. Halves Thick Skin. One per player." },
+  shred:    { name: 'Shred Rounds',  info: "Hits also deal 6% of the target's max HP. Halves Thick Skin. One per player." },
   cond:     { name: 'Conditioning',  base: 12, scale: 8,  info: '+12 HP. +8 more each battle.' },
-  vet:      { name: 'Veteran',       base: 2,  scale: .75, info: '+2 damage. +3 more every 4 kills.' },
-  iron:     { name: 'Iron Wall',     base: 1,  scale: .75, info: '+1 armor. +3 more every 4 battles survived.' },
+  vet:      { name: 'Veteran',       base: 4,  scale: .75, info: '+4 damage. +3 more every 4 kills.' },
+  iron:     { name: 'Iron Wall',     base: 4,  scale: .75, info: '+4 armor. +3 more every 4 battles survived.' },
 };
 // Role passives: a shared pool per role (3 each). Prep picks one per player from their real stats; strength scales with rarity.
 // Self passives (Entry, Anchor, Flank, Roam) are full strength in their own zone and half elsewhere; team calls work from anywhere,
@@ -77,7 +77,7 @@ const ROLE_PASSIVES = {
   lastline:  { role: 'Anchor',  name: 'Last Line',      v: .1,   info: v => `+${pct(v)} damage while 3+ teammates are alive.` },
   medic:     { role: 'Support', name: 'Medic',          team: true, v: .3,  info: v => `Team heals +${pct(v)}.` },
   quarter:   { role: 'Support', name: 'Quartermaster',  team: true, v: 1,   info: v => `Team gadgets get +${Math.floor(v)} charge${Math.floor(v) > 1 ? 's' : ''}.` },
-  ammo:      { role: 'Support', name: 'Ammo Runner',    team: true, v: 0.3, info: v => `Team magazines +${pct(v)}.` },
+  ammo:      { role: 'Support', name: 'Ammo Runner',    team: true, v: 0.15, info: v => `Team magazines +${pct(v)}.` },
   crossfire: { role: 'Flank',   name: 'Crossfire',      v: 0.2,  info: v => `+${pct(v)} hit on enemies fighting someone else.` },
   pincer:    { role: 'Flank',   name: 'Pincer',         v: 0.18,  info: v => `+${pct(v)} damage while your Roam is alive.` },
   pressure:  { role: 'Flank',   name: 'Pressure',       v: .05,  ramp: true, info: v => `+${pct(v)} damage per burst fired (max 8).` },
@@ -100,7 +100,7 @@ const DUOS = [
 // Run keys (prep): income (¢ per round), mastery (extra per battle), duo (stacks added to every duo when picked).
 const TRINKETS = [
   { id: 'comms',   tier: 1, short: 'COMMS',  name: 'Comms Headset', hit: .03,          desc: 'Team +3% hit chance.' },
-  { id: 'spare',   tier: 1, short: 'AMMO',   name: 'Spare Mags',    mag: .5,           desc: 'Team +50% mag size.' },
+  { id: 'spare',   tier: 1, short: 'AMMO',   name: 'Spare Mags',    mag: .15,          desc: 'Team +15% mag size.' },
   { id: 'pouch',   tier: 1, short: 'POUCH',  name: 'Med Pouch',     hp: 8,             desc: 'Team +8 HP.' },
   { id: 'range',   tier: 1, short: 'RANGE',  name: 'Range Time',    dmg: .05,          desc: 'Team +5% damage.' },
   { id: 'piggy',   tier: 1, short: 'PIGGY',  name: 'Piggy Bank',    income: 1,         desc: '+¢1 per round.' },
@@ -110,15 +110,15 @@ const TRINKETS = [
   { id: 'chest',   tier: 2, short: 'CHEST',  name: 'War Chest',     income: 3,         desc: '+¢3 per round.' },
   { id: 'chem',    tier: 2, short: 'CHEM',   name: 'Team Chemistry', duo: 3,           desc: '+3 stacks to every duo.' },
   { id: 'invest',  tier: 2, short: 'INVEST', name: 'Org Investment', invest: 2,      desc: '+¢2 per round, +¢2 more each round (max ¢10).' },
-  { id: 'banner',  tier: 3, short: 'BANNER', name: 'Team Banner',   banner: .02,       desc: 'Team +2% damage per win.' },
-  { id: 'over',    tier: 3, short: 'OVERCLK', name: 'Overclock',    rpm: .12,          desc: 'Team +12% RPM.' },
+  { id: 'banner',  tier: 3, short: 'BANNER', name: 'Team Banner',   banner: .03,       desc: 'Team +3% damage per win.' },
+  { id: 'over',    tier: 3, short: 'OVERCLK', name: 'Overclock',    rpm: .3,           desc: 'Team +30% RPM.' },
   { id: 'crates',  tier: 3, short: 'CRATES', name: 'Kevlar Crates', hp: 20,            desc: 'Team +20 HP.' },
   { id: 'head',    tier: 3, short: 'HEADCO', name: 'Head Coach',    rp: .6,            desc: 'Role passives 60% stronger.' },
   { id: 'scopes',  tier: 3, short: 'SCOPES', name: 'Tac Scopes',    hit: .06,          desc: 'Team +6% hit chance.' },
   { id: 'cracked', tier: 4, short: 'CRACKED', name: 'Cracked',      dmg: .25,          desc: 'Team +25% damage.' },
   { id: 'jugg',    tier: 4, short: 'JUGG',   name: 'Juggernaut Kit', armor: 4, hp: 20, desc: 'Team +4 armor, +20 HP.' },
-  { id: 'golden',  tier: 4, short: 'GOLDEN', name: 'Golden Hands',  rpm: .2, mag: .5,  desc: 'Team +20% RPM, +50% mag size.' },
-  { id: 'dynasty', tier: 4, short: 'DYNASTY', name: 'Dynasty',      banner: .03, income: 3, desc: 'Team +3% damage per win. +¢3 per round.' },
+  { id: 'golden',  tier: 4, short: 'GOLDEN', name: 'Golden Hands',  rpm: .2, mag: .25, desc: 'Team +20% RPM, +25% mag size.' },
+  { id: 'dynasty', tier: 4, short: 'DYNASTY', name: 'Dynasty',      banner: .04, income: 3, desc: 'Team +4% damage per win. +¢3 per round.' },
   { id: 'legend',  tier: 4, short: 'LEGEND', name: 'Legend Status', rp: 1.2,           desc: 'Role passives 120% stronger.' },
 ];
 const TRK_EVERY = 3;
@@ -177,22 +177,22 @@ const CONTACT_AT = { Entry: 250, Flank: 450, Roam: 450, Anchor: 600, Support: 80
 const ITEMS = {
   Frag:            { throw: 'frag',   at: 480, label: 'FRAG',          boom: 35, chance: .65, info: 'May hit their lane player for 35. Blocked by ADS.' },
   'Breach Charge': { throw: 'breach', at: 560, label: 'BREACH CHARGE', site: .5, info: '+50% damage vs their Anchor. Blocked by Mute.' },
-  Stun:            { throw: 'flash',  at: 'contact', label: 'FLASH',    blind: 2000, info: 'Their lane player misses more for 2s. Blocked by ADS and Warden.' },
-  Smoke:           { throw: 'smoke',  at: 'contact', label: 'SMOKE',    smoke: 3000, info: 'Enemies miss more into this lane for 3s. Blocked by ADS and Warden.' },
-  'Stim Pack':     { label: 'STIM',     hp: 35,      info: '+35 HP.' },
+  Stun:            { throw: 'flash',  at: 'contact', label: 'FLASH',    blind: 1500, info: 'Their lane player misses more for 1.5s. Blocked by ADS and Warden.' },
+  Smoke:           { throw: 'smoke',  at: 'contact', label: 'SMOKE',    smoke: 2000, info: 'Enemies miss more into this lane for 2s. Blocked by ADS and Warden.' },
+  'Stim Pack':     { label: 'STIM',     hp: 50,      info: '+50 HP.' },
   // Consumables: simple stat changes for one battle
   'Hot Loads':     { label: 'HOT LOADS',    dmgMul: 1.25,               info: '+25% damage.' },
-  'Heavy Rounds':  { label: 'HEAVY ROUNDS', dmgMul: 1.75, rpmMul: .7,   info: '+75% damage, -30% RPM.' },
-  'Hair Trigger':  { label: 'HAIR TRIGGER', dmgMul: .9, rpmMul: 1.45,   info: '+45% RPM, -10% damage.' },
-  'Extra Mags':    { label: 'EXTRA MAGS',   magMul: 2, reloadMul: .5,   info: '2x mag size, 50% faster reloads.' },
+  'Heavy Rounds':  { label: 'HEAVY ROUNDS', dmgMul: 1.65, rpmMul: .7,   info: '+65% damage, -30% RPM.' },
+  'Hair Trigger':  { label: 'HAIR TRIGGER', dmgMul: 1, rpmMul: 1.45,    info: '+45% RPM.' },
+  'Extra Mags':    { label: 'EXTRA MAGS',   magMul: 1.6, reloadMul: .65, info: '+60% mag size, 35% faster reloads.' },
   'Trauma Plate':  { label: 'TRAUMA PLATE', armor: 7,                   info: '+7 armor.' },
   'Steady Aim':    { label: 'STEADY AIM',   hit: .1,                    info: '+10% hit chance.' },
   'Prize Money':   { label: 'PRIZE MONEY', info: '+¢4 if they get the most kills on your team.' },
   Painkillers:     { label: 'PAINKILLERS',  dr: .18,                    info: '-18% damage taken.' },
-  Adrenaline:      { label: 'ADRENALINE', adren: .4, info: '+40% RPM for the first 3s.' },
+  Adrenaline:      { label: 'ADRENALINE', adren: .6, info: '+60% RPM for the first 3s.' },
   'AP Rounds':     { label: 'AP ROUNDS', pierce: 1,  info: 'Bullets ignore armor.' },
-  Incendiary:      { label: 'INCENDIARY', burn: .03, info: 'Hits burn 3% max HP per second for 2s.' },
-  Claymore:        { throw: 'clay',   at: 'contact', label: 'CLAYMORE', boom: 35, chance: .65, info: 'May hit the first pusher for 35. Blocked by Grim.' },
+  Incendiary:      { label: 'INCENDIARY', burn: .1, info: 'Hits burn 10% max HP per second for 2s.' },
+  Claymore:        { throw: 'clay',   at: 'contact', label: 'CLAYMORE', boom: 50, chance: .65, info: 'May hit the first pusher for 50. Blocked by Grim.' },
 };
 
 // A player can hold any number of one-battle items. Their effects add up (two Hot Loads = +50% damage, not x1.56),
@@ -269,8 +269,8 @@ let KEV_HP = 32, PLATE_ARMOR = 10, HOLLOW_DMG = .4;
 let SKIN_BASE = .10, SKIN = .04; // Thick Skin, per copy: damage cut from the first hit, plus this much per hit taken
 let HOLLOW_FLOOR = .21; // armor floor for Hollow Points bullets
 let SKIN_CAP = .6; // Thick Skin max damage cut
-let BLOOD_HEAL = 30, PLATE_BURN = .15, BURN_CAP = .9, SHRED_SKIN = .5; // Bloodthirst heal per kill; fire damage cut per plate (max); share of Thick Skin that works vs Shred bullets // Bloodthirst heal per kill; burn cut per plate
-let SHRED = .08; // Shred Rounds: share of the target's max HP added to each hit (doesn't stack)
+let BLOOD_HEAL = 50, PLATE_BURN = .15, BURN_CAP = .9, SHRED_SKIN = .5; // Bloodthirst heal per kill; fire damage cut per plate (max); share of Thick Skin that works vs Shred bullets // Bloodthirst heal per kill; burn cut per plate
+let SHRED = .06; // Shred Rounds: share of the target's max HP added to each hit (doesn't stack)
 function statsFor(u) {
   const [armor, opGun] = OPS[u.op] || [2, 'MP5'];
   const gun = WEAPONS[u.weapon?.name] ? u.weapon.name : opGun;
@@ -284,10 +284,10 @@ function statsFor(u) {
     // Automatics keep their damage and have RPM evened out; pump and bolt guns keep their slow rate and hit harder per shot instead
     dmg: Math.round(dmg * (rof0 ? 1 : normRpm(dmg, rof) / rof) * (1 + .1 * (lvl - 1)) * (1 + HOLLOW_DMG * g('hollow')) * (it.dmgMul || 1)) + GEAR.vet.base * g('vet') + Math.floor(GEAR.vet.scale * gn('vet')),
     rpm: Math.round((rof0 ? normRpm(dmg, rof) : rof) * .95 ** Math.max(0, g('kevlar') - 2) * .975 ** g('plate') * (it.rpmMul || 1)),
-    hit: Math.min(.92, .32 + (u.pow - 100) / 250 + .05 * na('comp') + (it.hit || 0)),       // chance each bullet lands
+    hit: Math.min(.92, .32 + (u.pow - 100) / 250 + .08 * na('comp') + .04 * na('grip') + (it.hit || 0)),       // chance each bullet lands
     hs: (.02 + (u.pow - 100) / 3000 + (has('Headhunter') ? .04 : 0)) * through(dmg) / 36 * (T.hs || 1), // per landed bullet, scaled so headshots per second even out across guns
-    mag: Math.round(mag * (1 + .5 * na('ext')) * (it.magMul || 1)), reload: Math.round(T.reload * RELOAD_SCALE * (it.reloadMul || 1)), att: [...(u.att || [])], acog: na('acog'),
-    block: A.block + PLATE_ARMOR * g('plate') + GEAR.iron.base * g('iron') + Math.floor(GEAR.iron.scale * gn('iron')) + (it.armor || 0), dodge: A.dodge, react: A.react - 80 * na('grip'),
+    mag: Math.round(mag * (1 + .5 * na('ext')) * (it.magMul || 1)), reload: Math.round(T.reload * RELOAD_SCALE * (it.reloadMul || 1) * (1 - .25 * na('grip'))), att: [...(u.att || [])], acog: na('acog'),
+    block: A.block + PLATE_ARMOR * g('plate') + GEAR.iron.base * g('iron') + Math.floor(GEAR.iron.scale * gn('iron')) + (it.armor || 0), dodge: A.dodge, react: A.react,
     dr: it.dr || 0, gear, hollow: g('hollow'), momentum: g('momentum'), blood: g('blood'), fresh: g('fresh'), wind: g('wind'), revenge: g('revenge'), thick: g('thick'), shred: g('shred'), plate: g('plate'), reloads: 0, hits: 0, revUntil: 0,
     pierce: !!it.pierce, burn: it.burn || 0, adren: it.adren || 0,
     fx: 0, spent: 0, fxDmg: it.dmgMul > 1 ? it.dmgMul : 0, rpmFx: it.rpmMul > 1 ? it.rpmMul : 0, itArmor: it.armor || 0, steady: it.hit || 0,
@@ -473,7 +473,7 @@ function simulate(run, ghost) {
   // Live numbers for this moment of the round
   const rpmNow = (u, st) => u.rpm * (1 + call(u, 'tempo') * tk[u.side]) * (time < CONTACT_AT[u.zone] + 2000 ? 1 + my(u, 'first') : 1) * (u.adren && time < CONTACT_AT[u.zone] + 3000 ? 1 + u.adren : 1) * (st === 'early' && has(u, 'Opener') ? 1.25 : 1) * ((st === 'late' || st === 'clutch') && has(u, 'Closer') ? 1.25 : 1) * (u.winded ? 1 + .4 * u.wind : 1);
   const dmgNow = (u, st, tg) => u.dmg * (1 + my(u, 'lurker') * Math.min(5, Math.max(0, (time - CONTACT_AT[u.zone]) / 1000)) + my(u, 'hunter') * tk[u.side]
-      + my(u, 'pressure') * Math.min(8, u.streak) + (alive(u.side).length >= 3 ? my(u, 'lastline') : 0) + (alive(u.side).some(x => x.zone === 'Roam') ? my(u, 'pincer') : 0) + my(u, 'adapt')) * (1 + .15 * u.momentum * u.kills) * (time > OT.at ? 1 + OT.dmg * (time - OT.at) / 1000 : 1) * (TYPES[u.cls].dmg?.[RANGE[u.zone]] ?? 1) * (tg?.zone === 'Anchor' && u.siteBonus ? 1 + u.siteBonus : 1) * (u.open ? 1.1 : 1) * (1 + .08 * supports(u.side)) * (solo(u) && has(u, 'Clutch Gene') ? 1.25 : 1)
+      + my(u, 'pressure') * Math.min(8, u.streak) + (alive(u.side).length >= 3 ? my(u, 'lastline') : 0) + (alive(u.side).some(x => x.zone === 'Roam') ? my(u, 'pincer') : 0) + my(u, 'adapt')) * (1 + .3 * u.momentum * u.kills) * (time > OT.at ? 1 + OT.dmg * (time - OT.at) / 1000 : 1) * (TYPES[u.cls].dmg?.[RANGE[u.zone]] ?? 1) * (tg?.zone === 'Anchor' && u.siteBonus ? 1 + u.siteBonus : 1) * (u.open ? 1.1 : 1) * (1 + .08 * supports(u.side)) * (solo(u) && has(u, 'Clutch Gene') ? 1.25 : 1)
     * (breached[other(u.side)] && u.zone === 'Entry' && st === 'early' ? 1 + WALL.breachDmg : 1)
     * (u.fresh && u.ammo > u.mag / 2 ? 1 + .2 * u.fresh : 1) * (u.revenge && time < u.revUntil ? 1 + .35 * u.revenge : 1)
     * (has(u, 'Winner') && alive(u.side).length > alive(other(u.side)).length ? 1.15 : 1); // Winner: plays from in front
@@ -584,7 +584,7 @@ function simulate(run, ghost) {
     if (sh.adren && time < CONTACT_AT[sh.zone] + 3000) sh.fx += shots * sh.adren / (1 + sh.adren);
     if (my(sh, 'flash') && !sh.flashed) { sh.flashed = true; tg.fhUntil = time + 2000; tg.fhV = my(sh, 'flash'); }   // Flash Hands: first target
     sh.streak++;                                                                                                         // Pressure: bursts fired
-    let hitP = Math.max(.05, Math.min(.92, sh.hit + call(sh, 'aim') + my(sh, 'adapt') + (tg.tg && tg.tg !== sh ? my(sh, 'crossfire') : 0) - (sh.fhUntil > time ? sh.fhV : 0) + TYPES[sh.cls].hit[RANGE[sh.zone]] + sh.acog * (RANGE[sh.zone] === 'close' ? -.04 : .06) + (sh.jump ? .1 : 0) + tg.rev - (sh.conc > time ? .2 : 0) - (sh.blind > time ? .3 : 0) - ((smokeUntil[tg.side][tg.zone] || 0) > time ? .25 : 0) + (sh.zone === 'Anchor' && wall[sh.side] && !breached[sh.side] ? WALL.hit : 0)));
+    let hitP = Math.max(.05, Math.min(.92, sh.hit + call(sh, 'aim') + my(sh, 'adapt') + (tg.tg && tg.tg !== sh ? my(sh, 'crossfire') : 0) - (sh.fhUntil > time ? sh.fhV : 0) + TYPES[sh.cls].hit[RANGE[sh.zone]] + sh.acog * (RANGE[sh.zone] === 'close' ? -.02 : .1) + (sh.jump ? .1 : 0) + tg.rev - (sh.conc > time ? .2 : 0) - (sh.blind > time ? .3 : 0) - ((smokeUntil[tg.side][tg.zone] || 0) > time ? .25 : 0) + (sh.zone === 'Anchor' && wall[sh.side] && !breached[sh.side] ? WALL.hit : 0)));
     hitP *= HIT_SCALE;   // one global dial: every bonus and penalty above shrinks with it
     const hsP = sh.hs + (solo(sh) && has(sh, 'Clutch Gene') ? .04 : 0);
     sh.jump = false; sh.fired = true;
