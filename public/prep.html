@@ -304,6 +304,10 @@
   @keyframes pip { 0% { transform: rotate(45deg) scale(2.2); } 100% { transform: rotate(45deg) scale(1); } }
   .tick-up { color: var(--primary) !important; } .tick-down { color: var(--danger) !important; }
 
+  /* Short screens (Safari with its toolbars showing): one shop row so the board keeps its room */
+  @media (max-height: 360px) { .shopbar { height: 5.4rem; } .shop { grid-template-columns: repeat(9, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); gap: .25rem; }
+    .shop .card { padding: .15rem .15rem; } .shop .card .art { padding-top: .7rem; }
+    .tools { gap: .2rem; } .tool { gap: 0; min-height: 0; overflow: hidden; } .tool svg.i { font-size: 1rem; } }
   @media (max-width: 760px) { .mapChip .mods { display: none; } .hud { gap: .7rem; } .dock { gap: .9rem; } }
 
   .rotate { display: none; position: fixed; inset: 0; place-items: center; text-align: center; padding: 1.5rem; }

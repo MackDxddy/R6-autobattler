@@ -261,6 +261,9 @@ const FALLOFF = .2;
 let ARMOR_FLOOR = .28;
 // Share of normal accuracy that lands. Lower = more bursts per kill, longer fights, more shooting on screen.
 let HIT_SCALE = .45;
+// The round plays back ~4x slower than it runs, so reloads and the pause to find a new target are kept short here
+// (a 2.4s rifle reload shows as ~4s on screen, not ~10s).
+let RELOAD_SCALE = .4, RETARGET = .5;
 // Balance dials (gear text in both files must match these)
 let KEV_HP = 32, PLATE_ARMOR = 10, HOLLOW_DMG = .4;
 let SKIN_BASE = .10, SKIN = .04; // Thick Skin, per copy: damage cut from the first hit, plus this much per hit taken
@@ -283,7 +286,7 @@ function statsFor(u) {
     rpm: Math.round((rof0 ? normRpm(dmg, rof) : rof) * .95 ** Math.max(0, g('kevlar') - 2) * .975 ** g('plate') * (it.rpmMul || 1)),
     hit: Math.min(.92, .32 + (u.pow - 100) / 250 + .05 * na('comp') + (it.hit || 0)),       // chance each bullet lands
     hs: (.02 + (u.pow - 100) / 3000 + (has('Headhunter') ? .04 : 0)) * through(dmg) / 36 * (T.hs || 1), // per landed bullet, scaled so headshots per second even out across guns
-    mag: Math.round(mag * (1 + .5 * na('ext')) * (it.magMul || 1)), reload: Math.round(T.reload * (it.reloadMul || 1)), att: [...(u.att || [])], acog: na('acog'),
+    mag: Math.round(mag * (1 + .5 * na('ext')) * (it.magMul || 1)), reload: Math.round(T.reload * RELOAD_SCALE * (it.reloadMul || 1)), att: [...(u.att || [])], acog: na('acog'),
     block: A.block + PLATE_ARMOR * g('plate') + GEAR.iron.base * g('iron') + Math.floor(GEAR.iron.scale * gn('iron')) + (it.armor || 0), dodge: A.dodge, react: A.react - 80 * na('grip'),
     dr: it.dr || 0, gear, hollow: g('hollow'), momentum: g('momentum'), blood: g('blood'), fresh: g('fresh'), wind: g('wind'), revenge: g('revenge'), thick: g('thick'), shred: g('shred'), plate: g('plate'), reloads: 0, hits: 0, revUntil: 0,
     pierce: !!it.pierce, burn: it.burn || 0, adren: it.adren || 0,
@@ -477,7 +480,11 @@ function simulate(run, ghost) {
 
   // Everyone runs on one clock. Each player fires bursts on their own rhythm: a burst is a fixed trigger-pull,
   // so a fast gun puts more (lighter) rounds into it. They shoot whoever they can see, mostly the nearest enemy.
-  const WINDOW = 600, RESET = 250; // long trigger-pulls, short pauses: steady fire instead of stop-start
+  const WINDOW = 600, RESET = 250; // pump and bolt guns: one trigger-pull window, then a short pause
+  // Automatics vary each trigger pull: a tap, a short burst, a long spray or the rest of the mag, each with a pause that fits it.
+  // [min shots, max shots (long: share of what's left in the mag), min pause, max pause]; mix = chance of each by gun type
+  const FIRE = [['tap', 1, 1, 120, 260], ['short', 2, 3, 160, 340], ['long', .4, .7, 220, 420], ['dump', 1, 1, 80, 180]];
+  const FIRE_MIX = { AR: [.15, .35, .3, .2], SMG: [.1, .3, .3, .3], MP: [.1, .3, .3, .3], LMG: [.05, .25, .35, .35] };
   const react = u => Math.max(100, 420 - (u.pow - 100) * 2.5 + u.react);
   const pos = u => SPOTS[u.side][u.zone], dist = (a, b) => Math.hypot(pos(a)[0] - pos(b)[0], pos(a)[1] - pos(b)[1]);
   units.forEach(u => { u.ammo = u.mag; u.next = CONTACT_AT[u.zone] + react(u) + rng() * 250; u.tg = null; u.by = null; u.killAt = -1e9; });
@@ -499,7 +506,7 @@ function simulate(run, ghost) {
     // Caveira's first kill becomes an interrogation: the whole enemy team is revealed
     if (killer.op === 'caveira' && !killer.gone && killer.alive) { killer.gone = true; time = Math.max(time, at + 200); reveal(killer, alive(victim.side), .08, 'INTERROGATED'); }
     // Anyone who was on the victim has to find a new angle
-    alive(killer.side).forEach(u => { if (u.tg === victim) { u.tg = null; u.next = Math.max(u.next, at + react(u) + 250 + rng() * 350); } });
+    alive(killer.side).forEach(u => { if (u.tg === victim) { u.tg = null; u.next = Math.max(u.next, at + RETARGET * react(u) + 80 + rng() * 150); } });
     // Their teammates swing toward the killer to trade
     alive(victim.side).forEach(u => { if (dist(u, killer) < 40 && rng() < .5) u.by = killer; });
     // Bloodthirst: the killer heals
@@ -561,7 +568,16 @@ function simulate(run, ghost) {
       sh.next = time + 120; continue;                   // a beat to line up the shot
     }
     // The burst: each bullet rolls to hit, each hit might be a headshot; armor blocks a flat amount per bullet
-    const rpm = rpmNow(sh, st), n = rpm * WINDOW / 60000, shots = Math.min(sh.ammo, Math.max(1, Math.floor(n) + (rng() < n % 1 ? 1 : 0)));
+    const rpm = rpmNow(sh, st), mix = FIRE_MIX[sh.cls];
+    let shots, pause = RESET;
+    if (!mix) { const n = rpm * WINDOW / 60000; shots = Math.min(sh.ammo, Math.max(1, Math.floor(n) + (rng() < n % 1 ? 1 : 0))); }
+    else {
+      const left = Math.max(1, Math.ceil(sh.ammo / SPRAY)); let r = rng(), k = 0;
+      while (k < 3 && r >= mix[k]) r -= mix[k++];
+      const [mode, a, b, p0, p1] = FIRE[k];
+      shots = mode === 'long' ? Math.max(4, Math.round(left * (a + rng() * (b - a)))) : mode === 'dump' ? left : a + Math.floor(rng() * (b - a + 1));
+      shots = Math.min(left, shots); pause = p0 + rng() * (p1 - p0);
+    }
     if (sh.rpmFx) sh.fx += shots * (1 - 1 / sh.rpmFx);
     if (sh.adren && time < CONTACT_AT[sh.zone] + 3000) sh.fx += shots * sh.adren / (1 + sh.adren);
     if (my(sh, 'flash') && !sh.flashed) { sh.flashed = true; tg.fhUntil = time + 2000; tg.fhV = my(sh, 'flash'); }   // Flash Hands: first target
@@ -606,7 +622,7 @@ function simulate(run, ghost) {
     if (tg.wind && !tg.winded && tg.hp > 0 && tg.hp < .5 * tg.maxHp) { // Second Wind
       tg.winded = true; const amt = Math.min(35 * tg.wind, tg.maxHp - tg.hp); tg.hp += amt; ev.push({ t: 'heal', at: time + 120, from: tg.id, to: tg.id, amt, hp: tg.hp });
     }
-    sh.next = time + (shots * 60000 / rpm + RESET) * (.85 + rng() * .3);
+    sh.next = time + shots * 60000 / rpm * (.9 + rng() * .2) + pause;
     const used = ['SG', 'DMR'].includes(sh.cls) ? shots : Math.ceil(shots * SPRAY);
     sh.ammo -= used; sh.spent += used;
     ev.at(-1).ammo = Math.max(0, sh.ammo);
