@@ -1,6 +1,6 @@
 // Landscape without asking. iPhone browsers can't lock the screen to landscape, so when the phone reports
-// portrait we draw the page turned 90 degrees: hold the phone with its top to the right (home bar on the
-// left). If the phone really is in landscape, nothing changes.
+// portrait we draw the page turned 90 degrees: hold the phone with its top to the left (home bar on the
+// right). If the phone really is in landscape, nothing changes.
 // Page code keeps working in landscape terms: rects, pointer positions and elementFromPoint are translated
 // here; for the page size use TURN.w / TURN.h, so no other file needs to know.
 (() => {
@@ -42,7 +42,11 @@
       transform-origin: 0 0; transform: rotate(90deg) translateY(-100%); }
     /* The notch side becomes the left edge, the home bar side the right */
     html.turned { --sa-top: env(safe-area-inset-right); --sa-right: env(safe-area-inset-bottom);
-      --sa-bottom: env(safe-area-inset-left); --sa-left: env(safe-area-inset-top); }`;
+      --sa-bottom: env(safe-area-inset-left); --sa-left: env(safe-area-inset-top); }
+    /* Full-screen overlays keep clear of the camera and home bar too */
+    .drop, .result, .modes, .elsewhere {
+      padding-top: max(1rem, var(--sa-top, env(safe-area-inset-top))); padding-right: max(1rem, var(--sa-right, env(safe-area-inset-right)));
+      padding-bottom: max(1rem, var(--sa-bottom, env(safe-area-inset-bottom))); padding-left: max(1rem, var(--sa-left, env(safe-area-inset-left))); }`;
   document.head.appendChild(css);
 
   update();
