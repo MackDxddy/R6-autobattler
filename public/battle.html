@@ -224,7 +224,7 @@
   .board th:first-child { text-align: left; color: var(--hi); }
   .board td { padding: .18em 1em; text-align: right; color: var(--fg); font-variant-numeric: tabular-nums; }
   .board td.sbname { display: flex; align-items: center; gap: .5em; text-align: left; white-space: nowrap; }
-  .board .itc { text-align: left; white-space: nowrap; } .board .itn { color: var(--muted); }
+  .board .itc { text-align: left; white-space: normal; max-width: 13em; line-height: 1.2; } .board .itn { color: var(--muted); }
   .board td.sbname .op { width: 1.3em; height: 1.3em; color: var(--primary); }
   .board tr.dead td { opacity: .55; } .board tr.mvp td:nth-child(2) { color: var(--accent); font-weight: 700; }
   .result .acts { display: flex; gap: .5rem; }
@@ -788,18 +788,21 @@ function scoreboard() {
   const rows = side => SIM.units.filter(u => u.side === side).map(u => ({ u, ...st[u.id] })).sort((a, b) => b.k - a.k || b.dmg - a.dmg);
   const top = { mine: Math.max(0, ...rows('mine').map(x => x.k)), theirs: Math.max(0, ...rows('theirs').map(x => x.k)) };
   const item = u => {
-    const n = u.buff?.name, it = ITEMS[n]; if (!it) return '–';
+    const names = buffsOf(u).map(b => b.name).filter(n => ITEMS[n]), kinds = [...new Set(names)];
+    if (!names.length) return '–';
+    if (kinds.length > 1) return `<span class="itn">${kinds.map(k => esc(k) + ((c => c > 1 ? ' ×' + c : '')(names.filter(n => n === k).length))).join(' · ')}</span>`;
+    const n = kinds[0], it = ITEMS[n], cnt = names.length;
     const f = Math.round(u.fx), pl = (n, w, ws = w + 's') => `${n} ${n === 1 ? w : ws}`, ue = SIM.ev.find(e => e.t === 'util' && e.from === u.id);
     const r = it.throw ? (!ue ? 'Not used' : ue.block ? 'Blocked' : ue.missed ? 'Missed' : it.boom ? `${ue.dmg} dmg` : it.site ? `+${f} dmg` : pl(f, 'enemy miss', 'enemy misses'))
-      : it.hp ? `+${it.hp} HP`
+      : it.hp ? `+${it.hp * cnt} HP`
       : it.burn ? `${f} burn dmg`
-      : n === 'Prize Money' ? (top[u.side] && u.kills === top[u.side] ? '+¢4' : 'No bonus')
-      : it.magMul ? pl(Math.max(0, Math.floor(u.spent / (u.mag / it.magMul)) - u.reloads), 'fewer reload')
+      : n === 'Prize Money' ? (top[u.side] && u.kills === top[u.side] ? `+¢${4 * cnt}` : 'No bonus')
+      : it.magMul ? pl(Math.max(0, Math.floor(u.spent / (u.mag / (1 + (it.magMul - 1) * cnt))) - u.reloads), 'fewer reload')
       : it.rpmMul > 1 || it.adren ? '+' + pl(f, 'shot')
       : it.hit ? '+' + pl(f, 'hit')
       : it.armor || it.dr ? `${f} dmg blocked`
       : `+${f} dmg`;
-    return `<span class="itn">${esc(n)}</span> ${r}`;
+    return `<span class="itn">${esc(n)}${cnt > 1 ? ' ×' + cnt : ''}</span> ${r}`;
   };
   const mvp = rows('mine').concat(rows('theirs')).sort((a, b) => b.k - a.k || b.dmg - a.dmg)[0]?.u;
   const tr = x => `<tr class="${x.u.alive ? '' : 'dead'} ${x.u === mvp ? 'mvp' : ''}"><td class="sbname">${opIcon(x.u.op)}<span style="color:var(--r-${x.u.rarity})">${esc(x.u.name)}</span></td>
@@ -851,7 +854,7 @@ function showPop(u, t) {
   const st = (ico, v, title) => `<span title="${title}">${ICO[ico]}<b>${v}</b></span>`;
   const tags = [...(u.passives || []),
     ...Object.entries((u.gear || []).reduce((a, x) => (a[x.id] = (a[x.id] || 0) + 1, a), {})).map(([id, n]) => GEAR[id].name + (n > 1 ? ' ×' + n : '')),
-    u.buff?.name].filter(Boolean);
+    ...Object.entries(buffsOf(u).reduce((a, b) => (a[b.name] = (a[b.name] || 0) + 1, a), {})).map(([n, k]) => n + (k > 1 ? ' ×' + k : ''))].filter(Boolean);
   pop.innerHTML = `<div class="ph"><b style="color:var(--r-${u.rarity})">${esc(u.name)}</b><span class="mut">${esc(u.gun)}</span></div>
     <div class="pst">${st('hp', `${hp}/${u.maxHp}`, 'Health')}${st('arm', u.block, 'Armor')}${st('dmg', u.dmg, 'Damage per bullet')}${st('rpm', u.rpm, 'Rounds per minute')}${st('mag', u.mag, 'Magazine')}</div>
     ${u.rpx ? `<div class="ln"><b>${ROLE_PASSIVES[u.rpx.id].name}</b> ${ROLE_PASSIVES[u.rpx.id].info(u.rpx.v)}</div>` : ''}
@@ -884,7 +887,7 @@ document.addEventListener('click', e => {
   if (['contBtn', 'endlessBtn', 'newRunBtn'].includes(t.id)) {
     // Report back to prep: it applies income, mastery, duo stacks and scaling gear
     try { localStorage.setItem('battler.result', JSON.stringify({ round: RUN.round, win: RUN.verdict ?? !!LAST?.win, endless: t.id === 'endlessBtn', end: t.id === 'newRunBtn',
-      team: SIM.units.filter(u => u.side === 'mine').map(u => ({ pid: u.pid, kills: u.kills, alive: u.alive, buff: u.buff?.name || null })) })); } catch {}
+      team: SIM.units.filter(u => u.side === 'mine').map(u => ({ pid: u.pid, kills: u.kills, alive: u.alive, buffs: buffsOf(u).map(b => b.name) })) })); } catch {}
     try { localStorage.removeItem('battler.prog'); } catch {}
     location.replace('prep.html?t=' + Date.now());
   }

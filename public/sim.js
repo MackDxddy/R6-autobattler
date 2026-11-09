@@ -195,6 +195,20 @@ const ITEMS = {
   Claymore:        { throw: 'clay',   at: 'contact', label: 'CLAYMORE', boom: 35, chance: .65, info: 'May hit the first pusher for 35. Blocked by Grim.' },
 };
 
+// A player can hold any number of one-battle items. Their effects add up (two Hot Loads = +50% damage, not x1.56),
+// with floors so stacking a downside can't zero a stat.
+const buffsOf = u => Array.isArray(u.buffs) ? u.buffs : u.buff ? [u.buff] : [];
+function mergeItems(list, table = ITEMS) {
+  const m = { hp: 0, armor: 0, hit: 0, dmgMul: 1, rpmMul: 1, magMul: 1, reloadMul: 1, dr: 0, adren: 0, burn: 0, pierce: 0 };
+  for (const b of list) { const it = table[b?.name]; if (!it) continue;
+    for (const k of ['hp', 'armor', 'hit', 'dr', 'adren', 'burn']) m[k] += it[k] || 0;
+    for (const k of ['dmgMul', 'rpmMul', 'magMul', 'reloadMul']) m[k] += (it[k] || 1) - 1;
+    if (it.pierce) m.pierce = 1; }
+  m.dmgMul = Math.max(.3, m.dmgMul); m.rpmMul = Math.max(.3, m.rpmMul); m.reloadMul = Math.max(.25, m.reloadMul); m.dr = Math.min(.6, m.dr);
+  return m;
+}
+const attCount = (u, id) => (u.att || []).filter(x => x === id).length;
+
 function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const hash = s => [...s].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619), 2166136261);
 /* ---------- Sim: one 5v5 round of gunfights and utility, seeded so the same boards replay the same round ---------- */
@@ -246,7 +260,7 @@ const FALLOFF = .2;
 // Armor soft cap: however much armor someone stacks, at least 35% of every bullet still gets through
 let ARMOR_FLOOR = .28;
 // Share of normal accuracy that lands. Lower = more bursts per kill, longer fights, more shooting on screen.
-let HIT_SCALE = .25;
+let HIT_SCALE = .45;
 // Balance dials (gear text in both files must match these)
 let KEV_HP = 32, PLATE_ARMOR = 10, HOLLOW_DMG = .4;
 let SKIN_BASE = .10, SKIN = .04; // Thick Skin, per copy: damage cut from the first hit, plus this much per hit taken
@@ -258,8 +272,8 @@ function statsFor(u) {
   const [armor, opGun] = OPS[u.op] || [2, 'MP5'];
   const gun = WEAPONS[u.weapon?.name] ? u.weapon.name : opGun;
   const [cls, dmg, rof0, mag] = WEAPONS[gun] || ['AR', 38, 700, 30], T = TYPES[cls], rof = rof0 || T.pump || 60;
-  const at = new Set(u.att || []), has = k => u.passives?.includes(k), lvl = u.lvl || 1, A = ARMOR[armor];
-  const it = ITEMS[u.buff?.name] || {}, gear = u.gear || [];
+  const na = id => attCount(u, id), has = k => u.passives?.includes(k), lvl = u.lvl || 1, A = ARMOR[armor];
+  const it = mergeItems(buffsOf(u)), gear = u.gear || [];
   const g = id => gear.filter(x => x.id === id).length, gn = id => gear.filter(x => x.id === id).reduce((a, x) => a + (x.n || 0), 0);
   const maxHp = A.hp + (has('Survivor') ? 15 : 0) + KEV_HP * g('kevlar') + GEAR.cond.base * g('cond') + Math.floor(GEAR.cond.scale * gn('cond')) + (it.hp || 0);
   return {
@@ -267,10 +281,10 @@ function statsFor(u) {
     // Automatics keep their damage and have RPM evened out; pump and bolt guns keep their slow rate and hit harder per shot instead
     dmg: Math.round(dmg * (rof0 ? 1 : normRpm(dmg, rof) / rof) * (1 + .1 * (lvl - 1)) * (1 + HOLLOW_DMG * g('hollow')) * (it.dmgMul || 1)) + GEAR.vet.base * g('vet') + Math.floor(GEAR.vet.scale * gn('vet')),
     rpm: Math.round((rof0 ? normRpm(dmg, rof) : rof) * .95 ** Math.max(0, g('kevlar') - 2) * .975 ** g('plate') * (it.rpmMul || 1)),
-    hit: Math.min(.92, .32 + (u.pow - 100) / 250 + (at.has('comp') ? .05 : 0) + (it.hit || 0)),       // chance each bullet lands
+    hit: Math.min(.92, .32 + (u.pow - 100) / 250 + .05 * na('comp') + (it.hit || 0)),       // chance each bullet lands
     hs: (.02 + (u.pow - 100) / 3000 + (has('Headhunter') ? .04 : 0)) * through(dmg) / 36 * (T.hs || 1), // per landed bullet, scaled so headshots per second even out across guns
-    mag: Math.round(mag * (at.has('ext') ? 1.5 : 1) * (it.magMul || 1)), reload: Math.round(T.reload * (it.reloadMul || 1)), att: [...at],
-    block: A.block + PLATE_ARMOR * g('plate') + GEAR.iron.base * g('iron') + Math.floor(GEAR.iron.scale * gn('iron')) + (it.armor || 0), dodge: A.dodge, react: A.react - (at.has('grip') ? 80 : 0),
+    mag: Math.round(mag * (1 + .5 * na('ext')) * (it.magMul || 1)), reload: Math.round(T.reload * (it.reloadMul || 1)), att: [...(u.att || [])], acog: na('acog'),
+    block: A.block + PLATE_ARMOR * g('plate') + GEAR.iron.base * g('iron') + Math.floor(GEAR.iron.scale * gn('iron')) + (it.armor || 0), dodge: A.dodge, react: A.react - 80 * na('grip'),
     dr: it.dr || 0, gear, hollow: g('hollow'), momentum: g('momentum'), blood: g('blood'), fresh: g('fresh'), wind: g('wind'), revenge: g('revenge'), thick: g('thick'), shred: g('shred'), plate: g('plate'), reloads: 0, hits: 0, revUntil: 0,
     pierce: !!it.pierce, burn: it.burn || 0, adren: it.adren || 0,
     fx: 0, spent: 0, fxDmg: it.dmgMul > 1 ? it.dmgMul : 0, rpmFx: it.rpmMul > 1 ? it.rpmMul : 0, itArmor: it.armor || 0, steady: it.hit || 0,
@@ -351,7 +365,7 @@ function simulate(run, ghost) {
   // Opening: EMPs and drones clear the way, then breaches, rounds and blasts, then gas and reveals
   units.forEach(u => {
     const s = u.side, foe = other(s), L = lv(u);
-    if (globalThis.NO_GADGETS && !ITEMS[u.buff?.name]) return; // balance testing: guns only
+    if (globalThis.NO_GADGETS && !buffsOf(u).some(b => ITEMS[b.name])) return; // balance testing: guns only
     if (u.op === 'thatcher') after(250, () => {
       if (!u.alive) return;
       const hit = holders(foe, ELECTRONIC).sort((a, b) => ELECTRONIC.indexOf(a.op) - ELECTRONIC.indexOf(b.op)).slice(0, u.ch);
@@ -429,8 +443,7 @@ function simulate(run, ghost) {
       });
     }
     // Throwables: each goes off once. ADS eats frags, flashes and smokes; Mute jams breach charges; Warden ignores flash and smoke
-    const it = ITEMS[u.buff?.name];
-    if (it?.throw) after(it.at === 'contact' ? CONTACT_AT[u.zone] + 120 : it.at, () => {
+    buffsOf(u).map(b => ITEMS[b.name]).filter(it => it?.throw).forEach(it => after(it.at === 'contact' ? CONTACT_AT[u.zone] + 120 : it.at, () => {
       if (!u.alive) return;
       const foes = alive(foe), pushers = foes.filter(x => PUSHERS.includes(x.zone));
       const t = it.throw === 'breach' ? (foes.find(x => x.zone === 'Anchor') || foes.find(x => x.zone === CROSS[u.zone]))
@@ -448,10 +461,10 @@ function simulate(run, ghost) {
       const wd = ['flash', 'smoke'].includes(it.throw) && alive(foe).find(x => x.op === 'warden');
       if (wd) return ev.push({ ...base, block: { id: wd.id, op: 'warden', text: 'IGNORED' } });
       if (it.boom) { if (rng() >= it.chance) return ev.push({ ...base, missed: true }); const h = hurt(t, it.boom); return ev.push({ ...base, dmg: h.dmg, hp: t.hp }); }
-      if (it.site) { u.siteBonus = it.site; return ev.push(base); }
+      if (it.site) { u.siteBonus = (u.siteBonus || 0) + it.site; return ev.push(base); }
       if (it.blind) { t.blind = time + it.blind; t.blindBy = u; return ev.push(base); }
       if (it.smoke) { smokeUntil[s][u.zone] = time + it.smoke; smokeBy[s][u.zone] = u; return ev.push({ ...base, to: u.id }); }
-    });
+    }));
   });
 
   // Live numbers for this moment of the round
@@ -464,7 +477,7 @@ function simulate(run, ghost) {
 
   // Everyone runs on one clock. Each player fires bursts on their own rhythm: a burst is a fixed trigger-pull,
   // so a fast gun puts more (lighter) rounds into it. They shoot whoever they can see, mostly the nearest enemy.
-  const WINDOW = 350, RESET = 450;
+  const WINDOW = 600, RESET = 250; // long trigger-pulls, short pauses: steady fire instead of stop-start
   const react = u => Math.max(100, 420 - (u.pow - 100) * 2.5 + u.react);
   const pos = u => SPOTS[u.side][u.zone], dist = (a, b) => Math.hypot(pos(a)[0] - pos(b)[0], pos(a)[1] - pos(b)[1]);
   units.forEach(u => { u.ammo = u.mag; u.next = CONTACT_AT[u.zone] + react(u) + rng() * 250; u.tg = null; u.by = null; u.killAt = -1e9; });
@@ -553,7 +566,7 @@ function simulate(run, ghost) {
     if (sh.adren && time < CONTACT_AT[sh.zone] + 3000) sh.fx += shots * sh.adren / (1 + sh.adren);
     if (my(sh, 'flash') && !sh.flashed) { sh.flashed = true; tg.fhUntil = time + 2000; tg.fhV = my(sh, 'flash'); }   // Flash Hands: first target
     sh.streak++;                                                                                                         // Pressure: bursts fired
-    let hitP = Math.max(.05, Math.min(.92, sh.hit + call(sh, 'aim') + my(sh, 'adapt') + (tg.tg && tg.tg !== sh ? my(sh, 'crossfire') : 0) - (sh.fhUntil > time ? sh.fhV : 0) + TYPES[sh.cls].hit[RANGE[sh.zone]] + (sh.att.includes('acog') ? (RANGE[sh.zone] === 'close' ? -.04 : .06) : 0) + (sh.jump ? .1 : 0) + tg.rev - (sh.conc > time ? .2 : 0) - (sh.blind > time ? .3 : 0) - ((smokeUntil[tg.side][tg.zone] || 0) > time ? .25 : 0) + (sh.zone === 'Anchor' && wall[sh.side] && !breached[sh.side] ? WALL.hit : 0)));
+    let hitP = Math.max(.05, Math.min(.92, sh.hit + call(sh, 'aim') + my(sh, 'adapt') + (tg.tg && tg.tg !== sh ? my(sh, 'crossfire') : 0) - (sh.fhUntil > time ? sh.fhV : 0) + TYPES[sh.cls].hit[RANGE[sh.zone]] + sh.acog * (RANGE[sh.zone] === 'close' ? -.04 : .06) + (sh.jump ? .1 : 0) + tg.rev - (sh.conc > time ? .2 : 0) - (sh.blind > time ? .3 : 0) - ((smokeUntil[tg.side][tg.zone] || 0) > time ? .25 : 0) + (sh.zone === 'Anchor' && wall[sh.side] && !breached[sh.side] ? WALL.hit : 0)));
     hitP *= HIT_SCALE;   // one global dial: every bonus and penalty above shrinks with it
     const hsP = sh.hs + (solo(sh) && has(sh, 'Clutch Gene') ? .04 : 0);
     sh.jump = false;
@@ -606,4 +619,4 @@ function simulate(run, ghost) {
   ev.push({ t: 'result', at: Math.max(time, ...ev.map(e => e.at || 0)) + 600, win: alive('mine').length > 0, left: alive('mine').length || alive('theirs').length });
   return { units, ev, wall, breached, trk: TRK };
 }
-globalThis.SIMCORE = { SPOTS, ARMOR, ARMOR_FLOOR, ATTACH, BASE_RPM, BLOOD_HEAL, CONTACT_AT, CROSS, DUOS, DUO_ROLES, ELECTRONIC, FALLOFF, FILL_ORDER, GADGETS, GEAR, HIT_SCALE, HOLLOW_FLOOR, HS_BONUS, ITEMS, KEV_HP, MASTERY, OPS, OT, PUSHERS, RANGE, ROLE_MULT, ROLE_PASSIVES, ROLE_ZONE, SHRED, SKIN_BASE, SKIN_CAP, SPRAY, TRAPS, TRINKETS, TRK_EVERY, TUNE, TYPES, WALL, WEAPONS, duoCast, duoStacks, duosFor, flexSubs, ghostTrinkets, hash, mastMul, mulberry32, normRpm, pct, rolePassive, simulate, statsFor, through, trkSum, trkTier };
+globalThis.SIMCORE = { SPOTS, buffsOf, mergeItems, ARMOR, ARMOR_FLOOR, ATTACH, BASE_RPM, BLOOD_HEAL, CONTACT_AT, CROSS, DUOS, DUO_ROLES, ELECTRONIC, FALLOFF, FILL_ORDER, GADGETS, GEAR, HIT_SCALE, HOLLOW_FLOOR, HS_BONUS, ITEMS, KEV_HP, MASTERY, OPS, OT, PUSHERS, RANGE, ROLE_MULT, ROLE_PASSIVES, ROLE_ZONE, SHRED, SKIN_BASE, SKIN_CAP, SPRAY, TRAPS, TRINKETS, TRK_EVERY, TUNE, TYPES, WALL, WEAPONS, duoCast, duoStacks, duosFor, flexSubs, ghostTrinkets, hash, mastMul, mulberry32, normRpm, pct, rolePassive, simulate, statsFor, through, trkSum, trkTier };

@@ -174,6 +174,7 @@
   .tile .buff.wep img { filter: invert(.86); }
   .attx { font-size: 1.1rem; font-weight: 700; letter-spacing: .06em; color: var(--hi); border: 1px solid var(--border); padding: .2rem .35rem; border-radius: 2px; }
   .tile .buff img { width: 80%; height: 80%; object-fit: contain; filter: var(--tint); }
+  .tile .buff em { position: absolute; right: -.55rem; top: -.55rem; font-style: normal; font-size: .75rem; font-weight: 700; color: var(--bg); background: var(--accent); border-radius: 2px; padding: 0 .15rem; line-height: 1.1; }
   .pow { position: absolute; left: 50%; bottom: -.7rem; transform: translateX(-50%); min-width: 2.6rem; padding: .05rem .35rem; text-align: center;
     font-weight: 700; color: var(--accent); background: var(--bg); border: 1px solid var(--accent); border-radius: 2px; }
 
@@ -238,6 +239,10 @@
   .pop .ln { font-size: .86rem; color: var(--muted); }
   .pop .ln b { color: var(--fg); font-weight: 500; }
   .pop .hint { font-size: .86rem; color: var(--accent); }
+  .pop .tags { display: flex; flex-wrap: wrap; gap: .25rem; align-items: center; }
+  .pop .tg { font: inherit; font-size: .86rem; color: var(--hi); border: 1px solid var(--border); border-radius: 2px; padding: .05rem .35rem; background: none; }
+  .pop .tg.on { border-color: var(--accent); color: var(--accent); }
+  .pop .tinfo { color: var(--hi); }
   .pop .acts { display: flex; gap: .4rem; justify-content: flex-end; margin-top: .15rem; }
   .pop.dock { grid-template-columns: minmax(0, 1fr) auto; align-content: center; gap: .15rem .8rem; padding: .4rem .65rem; }
   .pop.dock .h, .pop.dock .ln, .pop.dock .hint { grid-column: 1; }
@@ -322,7 +327,7 @@
     <span class="chip win" title="Wins"><svg class="i" viewBox="0 0 24 24"><path d="M6 2h12v3h4v3a5 5 0 0 1-5 5h-.4A6 6 0 0 1 13 16.9V19h4v3H7v-3h4v-2.1A6 6 0 0 1 7.4 13H7a5 5 0 0 1-5-5V5h4zm0 5H4v1a3 3 0 0 0 2 2.8zm12 0v3.8A3 3 0 0 0 20 8V7z"/></svg><span id="wins"></span><span id="winsOf">/10</span></span>
     <span class="chip rd" title="Round of the run"><small>ROUND</small><span id="roundNo"></span></span>
     <span class="chip mode" id="modeChip"></span>
-    <button class="chip trkChip" id="trkBtn" title="Trinkets" hidden></button>
+    <button class="chip trkChip" id="trkBtn" title="Buffs" hidden></button>
     <span class="grow"></span>
     <button class="chip mapChip" id="mapBtn">BANK<span class="mods" id="mapMods"></span></button>
     <button class="chip iconBtn" id="menuBtn" title="Menu" aria-label="Menu"><svg class="i" viewBox="0 0 24 24"><path d="M3 5h18v2H3zm0 6h18v2H3zm0 6h18v2H3z"/></svg></button>
@@ -392,12 +397,13 @@ const SILHOUETTE = '<svg class="sil" viewBox="0 0 24 24"><path d="M12 2.5c3 0 5.
 
 const EMPTY_WARN = { Entry:'No pressure on their Anchor', Anchor:'Their Entry walks in', Flank:'Their Roam is free', Roam:'Their Flank walks in', Support:'No lane boost' };
 const PASSIVES = {
-  'Clutch Gene': ['CG', 'Stronger when last alive.'],
-  'Opener':      ['OP', 'Wins the opening duel more often.'],
-  'Headhunter':  ['HS', 'More one-shot kills.'],
-  'Survivor':    ['SV', 'Harder to kill late in the round.'],
-  'Closer':      ['CL', 'Wins site-fight ties.'],
-  'Winner':      ['WN', 'Small team boost.'],
+  // Text matches what sim.js does. Each player with a passive gets it; it doesn't need others on the team.
+  'Clutch Gene': ['CG', 'Last one alive: +25% damage and more headshots.'],
+  'Opener':      ['OP', '+25% fire rate until 2 players are down.'],
+  'Headhunter':  ['HS', 'About 3x as many headshots.'],
+  'Survivor':    ['SV', '+15 HP.'],
+  'Closer':      ['CL', '+25% fire rate once 5 players are down, or in a clutch.'],
+  'Winner':      ['WN', 'No effect in fights yet.'],
 };
 
 // Role passives: one per player from a shared pool per role, picked from their real stats. Same table as the battle.
@@ -544,17 +550,26 @@ const B_GEAR = {
 
 // A player's starting numbers in battle: gear, attachments, this battle's item, op level and trinkets.
 // Not included: role passives, duos and auras (they depend on the fight).
+// Same as sim.js: one-battle items add up, with floors
+function mergeItems(list) {
+  const m = { hp: 0, armor: 0, hit: 0, dmgMul: 1, rpmMul: 1, magMul: 1, reloadMul: 1, dr: 0 };
+  for (const b of list) { const it = B_ITEMS[b?.name]; if (!it) continue;
+    for (const k of ['hp', 'armor', 'hit', 'dr']) m[k] += it[k] || 0;
+    for (const k of ['dmgMul', 'rpmMul', 'magMul', 'reloadMul']) m[k] += (it[k] || 1) - 1; }
+  m.dmgMul = Math.max(.3, m.dmgMul); m.rpmMul = Math.max(.3, m.rpmMul); m.reloadMul = Math.max(.25, m.reloadMul);
+  return m;
+}
 function cardStats(p) {
   const gun = gunOf(p); if (!gun) return null;
   const [cls, d, r0, mag] = WEAPONS[gun], rof = r0 || PUMP_RPM[cls] || 60, n2 = normRpm(d, rof);
-  const A = ARMOR[OP_ARMOR[p.op] || 2], it = (p.buff && B_ITEMS[p.buff.name]) || {}, gear = p.gear || [];
+  const A = ARMOR[OP_ARMOR[p.op] || 2], it = mergeItems(p.buffs || []), gear = p.gear || [];
   const g = id => gear.filter(x => x.id === id).length, gn = id => gear.filter(x => x.id === id).reduce((a, x) => a + (x.n || 0), 0);
   const T = k => trkSum(S.trinkets || [], k), lvl = p.op ? p.lvl || 1 : 1, att = p.att || [];
   const hp = A.hp + (p.passives.includes('Survivor') ? 15 : 0) + 32 * g('kevlar') + B_GEAR.cond.base * g('cond') + Math.floor(B_GEAR.cond.scale * gn('cond')) + (it.hp || 0) + T('hp');
   const armor = A.block + 10 * g('plate') + B_GEAR.iron.base * g('iron') + Math.floor(B_GEAR.iron.scale * gn('iron')) + (it.armor || 0) + T('armor');
   const dmg0 = Math.round(d * (r0 ? 1 : n2 / rof) * (1 + .1 * (lvl - 1)) * (1 + .4 * g('hollow')) * (it.dmgMul || 1)) + B_GEAR.vet.base * g('vet') + Math.floor(B_GEAR.vet.scale * gn('vet'));
   const rpm0 = Math.round((r0 ? n2 : rof) * .95 ** Math.max(0, g('kevlar') - 2) * .975 ** g('plate') * (it.rpmMul || 1));
-  const mag0 = Math.round(mag * (att.includes('ext') ? 1.5 : 1) * (it.magMul || 1));
+  const mag0 = Math.round(mag * (1 + .5 * att.filter(a => a === 'ext').length) * (it.magMul || 1));
   return { hp, armor, dmg: Math.round(dmg0 * (1 + T('dmg') + T('banner') * (S.wins || 0))), rpm: Math.round(rpm0 * (1 + T('rpm'))), mag: Math.round(mag0 * (1 + T('mag'))) };
 }
 const gunStats = (n, lvl) => { const g = gameGun(n, lvl);
@@ -707,7 +722,7 @@ function tile(p) {
     <span class="art">${p.op ? opIcon(p.op) : SILHOUETTE}</span>
     ${p.op && p.mains.includes(p.op) ? '<span class="star">★</span>' : ''}
     ${p.op ? `<span class="lvl">${pips(p.lvl)}</span>` : ''}
-    ${p.buff ? `<span class="buff ${p.buff.short ? 'txt' : ''}">${p.buff.short ? `<b>${p.buff.short}</b>` : `<img src="${GADGET(p.buff.img)}" alt="">`}</span>` : ''}
+    ${(b => b ? `<span class="buff ${b.short ? 'txt' : ''}">${b.short ? `<b>${b.short}</b>` : `<img src="${GADGET(b.img)}" alt="">`}${p.buffs.length > 1 ? `<em>×${p.buffs.length}</em>` : ''}</span>` : '')(p.buffs?.[0])}
     ${p.weapon ? `<span class="buff wep"><img src="${p.weapon.src}" alt=""></span>` : ''}
     <span class="plate">${nameEl(p.name)}</span>
   </button>${statBlock(p)}`;
@@ -744,11 +759,11 @@ function render() {
   // Rail: team power + synergy hexes
   const counts = passiveCounts();
   const mains = active().filter(p => p.op && p.mains.includes(p.op)).length;
-  // Each badge shows progress to its next tier (2 → 4); below the first tier it's just quiet text
+  // Passive badges: how many players on the team have it (each of them gets the effect)
   $('rail').innerHTML = `<div class="syns">` +
-    `<button class="syn ${mains >= 3 ? 'on' : 'off'} ${isSel('syn', 'k', 'main') ? 'sel' : ''}" data-syn="main"><span>★<b>${mains}/3</b></span></button>` +
+    `<button class="syn ${mains ? 'on' : 'off'} ${isSel('syn', 'k', 'main') ? 'sel' : ''}" data-syn="main"><span>★<b>×${mains}</b></span></button>` +
     Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([k, n]) =>
-      `<button class="syn ${n >= 4 ? 'max' : n >= 2 ? 'on' : 'off'} ${isSel('syn', 'k', k) ? 'sel' : ''}" data-syn="${k}"><span>${PASSIVES[k][0]}<b>${n}/${n >= 2 ? 4 : 2}</b></span></button>`).join('') +
+      `<button class="syn ${k === 'Winner' ? 'off' : 'on'} ${isSel('syn', 'k', k) ? 'sel' : ''}" data-syn="${k}"><span>${PASSIVES[k][0]}<b>×${n}</b></span></button>`).join('') +
     DUOS.filter(d => duoLive(d) || S.duos[d.id]).map(d => `<button class="syn ${!duoLive(d) ? 'off' : (S.duos[d.id] || 0) >= d.cap ? 'max' : 'on'} ${isSel('syn', 'k', 'duo:' + d.id) ? 'sel' : ''}" data-syn="duo:${d.id}"><span>${d.short}<b>${S.duos[d.id] || 0}/${d.cap}</b></span></button>`).join('') + '</div>';
 
   // Team row: zone groups in battle order; empty zones show as a warning ghost
@@ -870,6 +885,10 @@ function fitNames() {
   });
 }
 
+// Passives, gear, items and attachments as buttons: tap one to see what it does
+const tagRow = (tags, open, extra) => !tags.length && !extra ? '' : `<div class="ln tags">${tags.map(([label, info], i) =>
+  `<button class="tg ${open === i ? 'on' : ''}" data-tag="${i}">${esc(label)}</button>`).join('')}${extra ? `<span class="mut">${esc(extra)}</span>` : ''}</div>` +
+  (tags[open] ? `<div class="ln tinfo"><b>${esc(tags[open][0])}</b> · ${esc(tags[open][1] || '')}</div>` : '');
 /* Popover: all the detail text, anchored to whatever is selected */
 function renderPop() {
   const pop = $('pop'), sel = S.sel;
@@ -882,14 +901,15 @@ function renderPop() {
     place = 'dock'; pc = `var(--r-${p.rarity})`;
     // Three rows: name + gun, role passive, then one row of tags (bonuses green/red, everything else grey)
     const tags = [
-      ...p.passives,
-      ...Object.entries(p.gear.reduce((a, x) => (a[x.id] = (a[x.id] || 0) + 1, a), {})).map(([id, n]) => GEAR.find(g => g.id === id).name + (n > 1 ? ' ×' + n : '')),
-      p.buff?.name,
-    ].filter(Boolean);
+      ...p.passives.map(k => [k, PASSIVES[k]?.[1]]),
+      ...Object.entries(p.gear.reduce((a, x) => (a[x.id] = (a[x.id] || 0) + 1, a), {})).map(([id, n]) => (g => [g.name + (n > 1 ? ' ×' + n : ''), g.desc])(GEAR.find(g => g.id === id))),
+      ...Object.entries((p.buffs || []).reduce((a, b) => (a[b.name] = (a[b.name] || 0) + 1, a), {})).map(([n, k]) => [n + (k > 1 ? ' ×' + k : ''), ITEMS.find(x => x.name === n)?.desc + ' One battle.']),
+      ...Object.entries((p.att || []).reduce((a, id) => (a[id] = (a[id] || 0) + 1, a), {})).map(([id, k]) => (t => [t.name + (k > 1 ? ' ×' + k : ''), t.desc])(ATTACH.find(x => x.id === id))),
+    ];
     html = row(esc(p.name), gunOf(p) ? `${gunOf(p)} ${gunStats(gunOf(p), p.op ? p.lvl || 1 : 1)}` : '') +
       (zi >= 0 ? `<div class="ln">${aimLine(p, p.zone, zi)}</div>` : '') +
       `<div class="ln">${rpShort(p, p.zone)}</div>` +
-      (tags.length ? `<div class="ln tags">${tags.join(' · ')}</div>` : '') +
+      tagRow(tags, sel.tag) +
       `<div class="acts"><button class="btn" data-act="sell">Sell ¢${COST[p.rarity] - 1}</button></div>`;
   } else if (sel.type === 'slot') {
     const u = S.slots[sel.i];
@@ -905,7 +925,7 @@ function renderPop() {
       html = row(esc(p.name), `${p.rarity} · ${p.role}`) +
         `${(x => x ? `<div class="ln">Top <b>${Math.max(1, 100 - x[2])}%</b> of pros${x[4] ? ` · ${esc(x[4].slice(0, 2).join(', '))}${x[4].length > 2 ? ` +${x[4].length - 2}` : ''}` : ''}</div>` : '')(impactOf(p.name))}` +
         `<div class="ln">${rpShort(p)}</div>` +
-        `<div class="ln">${[...p.passives, 'mains ' + p.mains.map(m => OPS[m]?.[0] ?? m).join('/')].join(' · ')}</div>` +
+        tagRow(p.passives.map(k => [k, PASSIVES[k]?.[1]]), sel.tag, `mains ${p.mains.map(m => OPS[m]?.[0] ?? m).join('/')}`) +
         `<div class="acts"><button class="btn buy" data-act="buy">Buy ¢${costOf(c)}</button></div>`;
     } else if (c.kind === 'op') {
       html = row(OPS[c.op][0], `operator · ${OPS[c.op][1]}`) +
@@ -917,6 +937,12 @@ function renderPop() {
         : it.att ? row(it.name, `attachment · ¢${it.cost} · kept`) + `<div class="ln">${it.desc}</div><div class="hint">Tap a player to equip</div>`
         : row(it.name, `${it.r || ''} utility · ¢${costOf(c)} · one battle`) + `<div class="ln">${it.desc}</div><div class="hint">Tap a player to use</div>`;
     }
+  } else if (sel.type === 'confirm') {
+    const c = S.shop[sel.i], p = S.players.find(x => x.id === sel.id);
+    place = 'dock';
+    html = row(`Replace ${esc(sel.old)}?`, esc(p.name)) +
+      `<div class="ln">${esc(p.name)} gets <b>${esc(c.item.name)}</b> for ¢${costOf(c)}. ${esc(sel.old)} is lost${c.item.gun && p.att.length ? ', with its attachments' : ''}.</div>` +
+      `<div class="acts"><button class="btn" data-act="cancel">Cancel</button><button class="btn buy" data-act="replace">Replace</button></div>`;
   } else if (sel.type === 'syn') {
     anchor = document.querySelector(`[data-syn="${sel.k}"]`); place = 'right';
     if (sel.k.startsWith('duo:')) {
@@ -925,10 +951,10 @@ function renderPop() {
         `<div class="ln">${duoLive(d) ? '' : '<span class="warn">Off: needs both roles.</span> '}+1 stack per battle with <b>${d.a}</b> and <b>${d.b}</b> on the team. A Flex can fill one.</div>`;
     } else if (sel.k === 'main') {
       const n = active().filter(p => p.op && p.mains.includes(p.op)).length;
-      html = row('Main ops', `${n}/3`) + `<div class="ln">Players on a real main get +10%. Bonus at 3.</div>`;
+      html = row('Main ops', `${n} on team`) + `<div class="ln">A player on one of their mains gets +10% power.</div>`;
     } else {
       const n = passiveCounts()[sel.k] || 0;
-      html = row(sel.k, `${n} on team · 2 / 4`) + `<div class="ln">${PASSIVES[sel.k][1]}</div><div class="ln">Activates at <b>2</b>, maxes at <b>4</b>.</div>`;
+      html = row(sel.k, `${n} on team`) + `<div class="ln">${PASSIVES[sel.k][1]}</div><div class="ln mut">Each player with it gets this.</div>`;
     }
   } else if (sel.type === 'lane') {
     const z = ZONES.find(x => x.id === sel.z), ps = inLane(sel.z);
@@ -937,7 +963,7 @@ function renderPop() {
       `<div class="ln">${z.info}</div>${ps.length ? '' : `<div class="ln" style="color:var(--danger)">⚠ ${EMPTY_WARN[z.id]}</div>`}`;
   } else if (sel.type === 'trk') {
     anchor = $('trkBtn'); place = 'below';
-    html = row('Trinkets', 'whole team · permanent') + (S.trinkets || []).map(id => { const t = TRINKETS.find(x => x.id === id);
+    html = row('Buffs', 'whole team · permanent') + (S.trinkets || []).map(id => { const t = TRINKETS.find(x => x.id === id);
       return `<div class="ln"><b style="color:${TIER_COLOR[t.tier]}">${t.name}</b> · ${t.desc}</div>`; }).join('') +
       `<div class="hint">New pick every ${TRK_EVERY} rounds</div>`;
   } else if (sel.type === 'map') {
@@ -997,13 +1023,16 @@ function buy(i, target, opts = {}) {
     const toZone = opts.zone && active().length < 5 ? opts.zone : 'bench';
     if (opts.zone && toZone === 'bench') toast('Team full. Sent to bench');
     if (toZone === 'bench' && bench().length >= 3) return toast('Bench full. Sell someone', true);
-    const np = { ...c.p, id: c.p.id + Math.random().toString(36).slice(2, 6), zone: toZone, op: null, buff: null, weapon: null, att: [], gear: [] };
+    const np = { ...c.p, id: c.p.id + Math.random().toString(36).slice(2, 6), zone: toZone, op: null, buffs: [], weapon: null, att: [], gear: [] };
     S.players.push(np); S.flash = 'p:' + np.id;
   } else if (c.kind === 'op') {
     const r = addOp(c.op, opts.slot); if (!r) return;
     if (!r.merged && target && target.zone !== 'bench') equip(target, r.slot);
   } else {
     if (!target || target.zone === 'bench') return toast('Drop it on a player on the team', true);
+    // One gun per player: replacing a bought gun asks first
+    const old = c.item.gun ? target.weapon?.name : null;
+    if (old && !opts.ok) { S.sel = { type: 'confirm', i, id: target.id, old, fromRect }; return render(); }
     if (c.item.gun) { toast(target.att.length ? `${gunOf(target)} replaced · attachments removed` : `${gunOf(target)} replaced`); target.weapon = c.item; target.att = []; }
     else if (c.item.gear) {
       if (c.item.id === 'shred' && target.gear.some(x => x.id === 'shred')) return toast('Already has Shred Rounds', true);
@@ -1011,10 +1040,9 @@ function buy(i, target, opts = {}) {
     }
     else if (c.item.att) {
       if (!gunOf(target)) return toast('Give them an op or a gun first', true);
-      if (target.att.includes(c.item.id)) return toast(`Already has ${c.item.name}`, true);
       target.att.push(c.item.id);
     }
-    else target.buff = c.item;
+    else target.buffs = [...(target.buffs || []), c.item];
     S.flash = 'p:' + target.id;
   }
   spend(cost); c.sold = true; S.sel = null;
@@ -1044,6 +1072,7 @@ function reroll() {
   spend(cost); S.freeRerollUsed = true; S.frozen = false; S.sel = null;
   rollShop(); render();
 }
+const playerRound = () => S.round % 2 === 1;
 function rollShop() {
   const pick = a => a[Math.floor(Math.random() * a.length)];
   const pickRare = (list, key = 'r') => {
@@ -1053,11 +1082,14 @@ function rollShop() {
     return pick(list);
   };
   const opKeys = Object.keys(OPS).filter(op => !unitsOf(op).some(u => u.lvl === 3)); // maxed ops stop showing up
+  const misc = () => (r => r < .45 ? pickRare(ITEMS) : r < .65 ? pick(ATTACH) : pickRare(GEAR))(Math.random());
+  // Players are for sale every other round (odd rounds); in between those two cards are an extra op and item
   S.shop = [
-    { kind:'player', p: pickRare(POOL, 'rarity') }, { kind:'player', p: pickRare(POOL, 'rarity') },
+    ...(playerRound() ? [{ kind:'player', p: pickRare(POOL, 'rarity') }, { kind:'player', p: pickRare(POOL, 'rarity') }]
+      : [{ kind:'op', op: pick(opKeys) }, { kind:'item', item: misc() }]),
     { kind:'op', op: pick(opKeys) }, { kind:'op', op: pick(opKeys) },
     { kind:'item', item: gunItem(pick(Object.keys(WEAPONS))) },
-    { kind:'item', item: (r => r < .45 ? pickRare(ITEMS) : r < .65 ? pick(ATTACH) : pickRare(GEAR))(Math.random()) },
+    { kind:'item', item: misc() },
   ];
 }
 
@@ -1153,7 +1185,7 @@ function drop(d, t, rect) {
     const p = S.players.find(x => x.id === d.el.dataset.player), q = teamTile(t);
     if (t.id === 'sellZone') return sellPlayer(p);
     if (q && q.zone === p.zone) { const a = S.players.indexOf(p), b = S.players.indexOf(q); [S.players[a], S.players[b]] = [q, p]; S.flash = 'p:' + p.id; return render(); } // reorder
-    if (q) { [p.zone, q.zone] = [q.zone, p.zone]; if (p.zone === 'bench') p.buff = null; if (q.zone === 'bench') q.buff = null; S.flash = 'p:' + p.id; return render(); }
+    if (q) { [p.zone, q.zone] = [q.zone, p.zone]; if (p.zone === 'bench') p.buffs = []; if (q.zone === 'bench') q.buffs = []; S.flash = 'p:' + p.id; return render(); }
     if (t.dataset.slot !== undefined) { equip(p, +t.dataset.slot); return render(); }
     if (t.dataset.zone) {
       if (p.zone === 'bench' && active().length >= 5) { toast('Team full. Drop on a player to swap', true); return render(); }
@@ -1162,7 +1194,7 @@ function drop(d, t, rect) {
     if (t.dataset.bench) {
       if (p.zone === 'bench') { S.players.push(...S.players.splice(S.players.indexOf(p), 1)); return render(); } // to the end of the bench
       if (p.zone !== 'bench' && bench().length >= 3) { toast('Bench full', true); return render(); }
-      p.zone = 'bench'; p.buff = null; S.flash = 'p:' + p.id; return render();
+      p.zone = 'bench'; p.buffs = []; S.flash = 'p:' + p.id; return render();
     }
     return render();
   }
@@ -1180,7 +1212,7 @@ function drop(d, t, rect) {
 }
 
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-player],[data-lane],[data-zone],[data-bench],[data-slot],[data-buy],[data-act],[data-syn],[data-mode],[data-trk],[data-draft],#draftGo,#trkBtn,#rerollBtn,#freezeBtn,#readyBtn,#mapBtn,#fsBtn,#rotateFs,#menuBtn');
+  const t = e.target.closest('[data-player],[data-lane],[data-zone],[data-bench],[data-slot],[data-buy],[data-act],[data-tag],[data-syn],[data-mode],[data-trk],[data-draft],#draftGo,#trkBtn,#rerollBtn,#freezeBtn,#readyBtn,#mapBtn,#fsBtn,#rotateFs,#menuBtn');
   if (!t) { if (S.sel && !e.target.closest('#pop')) { S.sel = null; render(); } return; }
 
   if (t.dataset.player) {
@@ -1200,7 +1232,7 @@ document.addEventListener('click', e => {
     const p = selPlayer();
     if (!p) { S.sel = null; return render(); }
     if (p.zone !== 'bench' && bench().length >= 3) return toast('Bench full', true);
-    p.zone = 'bench'; p.buff = null; S.sel = null; S.flash = 'p:' + p.id; return render();
+    p.zone = 'bench'; p.buffs = []; S.sel = null; S.flash = 'p:' + p.id; return render();
   }
   if (t.dataset.slot !== undefined) {
     const i = +t.dataset.slot, p = selPlayer();
@@ -1214,7 +1246,10 @@ document.addEventListener('click', e => {
   if (t.id === 'trkBtn') return toggle({ type:'trk' });
   if (t.dataset.buy) return toggle({ type:'shop', i:+t.dataset.buy });
   if (t.dataset.syn) return toggle({ type:'syn', k:t.dataset.syn });
+  if (t.dataset.tag !== undefined && S.sel) { const k = +t.dataset.tag; S.sel.tag = S.sel.tag === k ? null : k; return renderPop(); }
   if (t.dataset.act === 'buy') return buy(S.sel.i);
+  if (t.dataset.act === 'replace') { const s = S.sel; return buy(s.i, S.players.find(x => x.id === s.id), { ok: true, fromRect: s.fromRect }); }
+  if (t.dataset.act === 'cancel') { S.sel = null; return render(); }
   if (t.dataset.act === 'sell') return sellPlayer(selPlayer());
   if (t.dataset.act === 'sellop') return sellOp(S.sel.i);
   if (t.id === 'fsBtn' || t.id === 'rotateFs') return goFullscreen();
@@ -1227,11 +1262,11 @@ document.addEventListener('click', e => {
     if (!active().length) return toast('Put a player on the team first', true);
     if (readying) return;
     // Hand the locked-in board to the battle screen
-    const team = active().map(p => ({ pid: p.id, mastery: p.mastery || 0, name: p.name, rarity: p.rarity, op: p.op, lvl: p.op ? p.lvl || 1 : 1, zone: p.zone, pow: power(p, p.zone, inLane(p.zone).indexOf(p)), passives: p.passives, role: p.role, rp: p.rp, buff: p.buff && { name: p.buff.name }, weapon: p.weapon && { name: p.weapon.name }, att: p.att, gear: p.gear.map(x => ({ id: x.id, n: x.n })) }));
+    const team = active().map(p => ({ pid: p.id, mastery: p.mastery || 0, name: p.name, rarity: p.rarity, op: p.op, lvl: p.op ? p.lvl || 1 : 1, zone: p.zone, pow: power(p, p.zone, inLane(p.zone).indexOf(p)), passives: p.passives, role: p.role, rp: p.rp, buffs: (p.buffs || []).map(b => ({ name: b.name })), weapon: p.weapon && { name: p.weapon.name }, att: p.att, gear: p.gear.map(x => ({ id: x.id, n: x.n })) }));
     const duos = Object.fromEntries(DUOS.filter(duoLive).map(d => [d.id, S.duos[d.id] || 0]));
     // fight: what battle.html plays (team, opponent, and for ranked the server's result)
     const launch = fight => {
-      S.players.forEach(p => { p.buff = null; }); // utility is spent; guns stay
+      S.players.forEach(p => { p.buffs = []; }); // utility is spent; guns stay
       try { localStorage.setItem('battler.run', JSON.stringify({ round: S.round, wins: S.wins, losses: S.losses, hp: S.hp, endless: !!S.endless, team, duos, trinkets: S.trinkets || [], ...fight }));
             localStorage.setItem('battler.save', JSON.stringify({ ...S, sel: null, flash: null, lvlup: null })); } catch {}
       try { localStorage.setItem('battler.phase', 'battle'); localStorage.removeItem('battler.prog'); } catch {}
@@ -1279,9 +1314,9 @@ function toRankedLost() { S.mode = 'casual'; S.runId = null; saveRun(); render()
 let readying = false; // READY pressed, waiting for the opponent
 
 /* ---------- Starting draft: a new run offers 5 random commons; you keep 3 for free ---------- */
-const DRAFT_SIZE = 5, DRAFT_KEEP = 3;
+const DRAFT_SIZE = 5, DRAFT_KEEP = 3, DRAFT_FLOOR = .85; // the weakest commons never show up in the draft
 function rollDraft() {
-  const commons = POOL.filter(p => p.rarity === 'common').sort(() => Math.random() - .5);
+  const commons = POOL.filter(p => p.rarity === 'common' && p.rating >= DRAFT_FLOOR).sort(() => Math.random() - .5);
   S.draft = { names: commons.slice(0, DRAFT_SIZE).map(p => p.name), picked: [] };
 }
 function showDraft() {
@@ -1308,7 +1343,7 @@ function finishDraft() {
   for (const p of picks) {
     const zone = free.includes(p.role) ? p.role : free[0];
     free.splice(free.indexOf(zone), 1);
-    S.players.push({ ...p, id: p.id + Math.random().toString(36).slice(2, 6), zone, op: null, buff: null, weapon: null, att: [], gear: [] });
+    S.players.push({ ...p, id: p.id + Math.random().toString(36).slice(2, 6), zone, op: null, buffs: [], weapon: null, att: [], gear: [] });
   }
   S.draft = null; $('drop').hidden = true; render(); saveRun();
 }
@@ -1321,7 +1356,7 @@ function rollOffer() {
 }
 function showDrop() {
   const o = S.offer, c = TIER_COLOR[o.tier];
-  $('drop').innerHTML = `<div class="box"><h2>PICK A TRINKET</h2><div class="sub">Tier ${ROMAN[o.tier]} · whole team · permanent</div>
+  $('drop').innerHTML = `<div class="box"><h2>PICK A BUFF</h2><div class="sub">Tier ${ROMAN[o.tier]} · whole team · permanent</div>
     <div class="tcards">${o.ids.map(id => { const t = TRINKETS.find(x => x.id === id);
       return `<button class="tcard" style="--tc:${c}" data-trk="${id}"><span class="tb">${t.short}</span><b>${t.name}</b><span>${t.desc}</span></button>`; }).join('')}</div></div>`;
   $('drop').hidden = false;
@@ -1364,7 +1399,7 @@ function afterBattle(r) {
   // Sponsorship (all owned, before this battle's growth), Prize Money (top killer holding it), Org Investment (grows each round)
   const sponsor = S.players.reduce((a, p) => a + p.gear.filter(g => g.id === 'spons').reduce((b, g) => b + Math.min(4, 1 + Math.floor(g.n / 3)), 0), 0);
   const top = Math.max(0, ...r.team.map(x => x.kills));
-  const prize = top ? r.team.filter(x => x.buff === 'Prize Money' && x.kills === top).length * 4 : 0;
+  const prize = top ? r.team.filter(x => x.kills === top).reduce((a, x) => a + (x.buffs || [x.buff]).filter(n => n === 'Prize Money').length, 0) * 4 : 0;
   let invest = 0; if (tr.includes('invest')) { S.investN = (S.investN || 0) + 1; invest = Math.min(10, 2 * S.investN); }
   const pay = base + interest + streak + sponsor + prize + invest;
   S.credits += pay; S.freeRerollUsed = false; S.sel = null;
@@ -1389,6 +1424,7 @@ if (toBattle) { location.replace('battle.html?t=' + Date.now()); throw new Error
 try {
   const sv = JSON.parse(localStorage.getItem('battler.save'));
   if (sv?.players) { Object.assign(S, sv); S.slots = S.slots.map(u => typeof u === 'string' ? { op: u, lvl: 1 } : u); delete S.stacks;
+    S.players.forEach(p => { if (!Array.isArray(p.buffs)) p.buffs = p.buff ? [p.buff] : []; delete p.buff; });
     // saved shop items are copies: refresh their text from the current tables
     S.shop = (S.shop || []).map(c => { const f = c.item && !c.item.gun && [...ITEMS, ...ATTACH, ...GEAR].find(x => x.id === c.item.id); return f ? { ...c, item: f } : c; }); }
   const r = JSON.parse(localStorage.getItem('battler.result'));

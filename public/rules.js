@@ -54,7 +54,7 @@ function P(name, year, rating, kd, entry, srv, clutch, plants, hs, atk, def, rol
   const [k, d] = kd.split('-').map(Number);
   const { role, rp } = pickRole(roles, { hs, ent, srv, clutch, wr, kd: k / Math.max(1, d), rating });
   return { id: name + year, name, year, rating, kd, entry, srv, clutch, hs, mains:[atk, def], roles, wr, role, rp,
-           rarity: rarityOf(rating, name, year), passives: passives.slice(0, 2), mastery: 0, op: null, zone: null, buff: null, weapon: null, att: [], gear: [] };
+           rarity: rarityOf(rating, name, year), passives: passives.slice(0, 2), mastery: 0, op: null, zone: null, buffs: [], weapon: null, att: [], gear: [] };
 }
 
 const POOL_FALLBACK = [
@@ -145,7 +145,7 @@ const RARITIES = ['common', 'rare', 'epic', 'legendary'];
 // from day 3. Ops come in about as fast as a player can buy them: 2 on day 1, then one more a day (all 5
 // by day 4). One player is upgraded every 2 days (at that day's shop odds), about one gear piece a day;
 // op levels and utility come in slowly.
-let GHOST_TUNE = { upEvery: 2, gearPerDay: .8, lvl2: .03, lvl3: .01, buff: .05 }; // per day: share of op upgrades, utility chance
+let GHOST_TUNE = { upEvery: 2, gearPerDay: .8, lvl2: .03, lvl3: .01, buff: .05, offZone: .35 }; // per day: share of op upgrades, utility chance; offZone: ops out of place
 function ghostFor(day, exclude = []) { // exclude: names the opponent must not use (your own players)
   const T = GHOST_TUNE, pick = a => a[Math.floor(Math.random() * a.length)];
   const rare = (list, key) => { const odds = RARITY_ODDS(day); let roll = Math.random() * 100, k = 0;
@@ -158,20 +158,22 @@ function ghostFor(day, exclude = []) { // exclude: names the opponent must not u
   const zones = ZONES.map(z => z.id).sort(() => Math.random() - .5).slice(0, size);
   const team = zones.map((zone, i) => {
     let p; do p = ups.has(i) ? rare(POOL, 'rarity') : pick(commons.length >= 5 ? commons : POOL); while (used.has(p.name)); used.add(p.name);
-    if (!withOp.has(i)) return { ...p, zone, op: null, lvl: 1, gear: [], buff: null };
-    const fits = p.mains.filter(o => OPS[o]?.[1] === zone && !ops.has(o));
-    const op = fits[0] || pick(Object.keys(OPS).filter(o => OPS[o][1] === zone && !ops.has(o))); ops.add(op);
+    if (!withOp.has(i)) return { ...p, zone, op: null, lvl: 1, gear: [], buffs: [] };
+    // Like a real player it doesn't always find the right op: sometimes one from another spot
+    const fits = p.mains.filter(o => OPS[o]?.[1] === zone && !ops.has(o)), free = Object.keys(OPS).filter(o => !ops.has(o));
+    const op = Math.random() < T.offZone ? pick(free.filter(o => OPS[o][1] !== zone))
+      : fits[0] || pick(free.filter(o => OPS[o][1] === zone)); ops.add(op);
     const r = Math.random(), l3 = Math.max(0, T.lvl3 * (day - 6)), l2 = Math.min(.5, Math.max(0, T.lvl2 * (day - 2)));
-    return { ...p, zone, op, lvl: r < l3 ? 3 : r < l3 + l2 ? 2 : 1, gear: [], buff: null };
+    return { ...p, zone, op, lvl: r < l3 ? 3 : r < l3 + l2 ? 2 : 1, gear: [], buffs: [] };
   });
   for (let i = 0; i < Math.round((day - 1) * T.gearPerDay); i++) {
     const g = rare(GEAR.filter(x => x.id !== 'spons'), 'r'), p = pick(team);
     if (g.id === 'shred' && p.gear.some(x => x.id === 'shred')) continue;
-    p.gear.push({ id: g.id, n: Math.floor(Math.random() * day) });
+    p.gear.push({ id: g.id, n: Math.max(0, Math.floor(day - 2 - i / T.gearPerDay)) }); // grown only by the fights since it would have been bought
   }
-  team.forEach(p => { if (Math.random() < Math.min(.4, T.buff * day)) p.buff = { name: rare(ITEMS, 'r').name }; });
+  team.forEach(p => { if (Math.random() < Math.min(.4, T.buff * day)) p.buffs = [{ name: rare(ITEMS, 'r').name }]; });
   return team.map(p => ({ name: p.name, rarity: p.rarity, op: p.op, lvl: p.lvl, zone: p.zone, pow: power(p, p.zone, 0), passives: p.passives,
-    role: p.role, rp: p.rp, buff: p.buff, weapon: null, att: [], gear: p.gear }));
+    role: p.role, rp: p.rp, buffs: p.buffs, weapon: null, att: [], gear: p.gear }));
 }
 
 // A board from another player, rebuilt from this game's own tables. Players or values the game doesn't know
@@ -195,8 +197,9 @@ function cleanGhost(team, opts = {}) {
     const idx = (lane[g.zone] = (lane[g.zone] ?? -1) + 1);
     out.push({ ...(opts.own ? { pid: base.id } : {}), name: base.name, rarity: base.rarity, role: base.role, rp: base.rp, passives: base.passives, zone: g.zone, op, lvl,
       mastery: Math.min(maxMastery, Math.max(0, g.mastery | 0)), pow: power({ ...base, op, lvl }, g.zone, idx),
-      buff: items.has(g.buff?.name) ? { name: g.buff.name } : null, weapon: WEAPONS[g.weapon?.name] ? { name: g.weapon.name } : null,
-      att: [...new Set((Array.isArray(g.att) ? g.att : []).filter(a => attIds.has(a)))].slice(0, 4), gear });
+      buffs: (Array.isArray(g.buffs) ? g.buffs : g.buff ? [g.buff] : []).filter(b => items.has(b?.name)).slice(0, 12).map(b => ({ name: b.name })),
+      weapon: WEAPONS[g.weapon?.name] ? { name: g.weapon.name } : null,
+      att: (Array.isArray(g.att) ? g.att : []).filter(a => attIds.has(a)).slice(0, 12), gear });
   }
   return out.length ? out : null;
 }

@@ -24,8 +24,8 @@ export function cleanTeam(team) {
       role: typeof p.role === 'string' && WORD.test(p.role) ? p.role : null,
       rp: typeof p.rp === 'string' && ID.test(p.rp) ? p.rp : null,
       passives: Array.isArray(p.passives) ? p.passives.filter(x => typeof x === 'string' && WORD.test(x)).slice(0, 6) : [],
-      buff: named(p.buff), weapon: named(p.weapon),
-      att: Array.isArray(p.att) ? p.att.filter(x => typeof x === 'string' && ID.test(x)).slice(0, 4) : [],
+      buffs: (Array.isArray(p.buffs) ? p.buffs : p.buff ? [p.buff] : []).map(named).filter(Boolean).slice(0, 12), weapon: named(p.weapon),
+      att: Array.isArray(p.att) ? p.att.filter(x => typeof x === 'string' && ID.test(x)).slice(0, 12) : [],
       gear: Array.isArray(p.gear) ? p.gear.filter(g => g && typeof g.id === 'string' && ID.test(g.id)).slice(0, 12).map(g => ({ id: g.id, n: int(g.n, 0, 99, 0) })) : [],
     });
   }
