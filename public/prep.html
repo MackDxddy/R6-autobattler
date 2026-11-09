@@ -85,6 +85,15 @@
   .tcard .tb { border: 1px solid var(--tc); color: var(--tc); font-weight: 700; padding: .25rem .45rem; letter-spacing: .08em; }
   .tcard b { color: var(--hi); }
   .tcard span { color: var(--muted); font-size: .86rem; line-height: 1.3; }
+  /* Starting draft: 5 commons, keep 3 */
+  .tcards.draft { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .6rem; }
+  .dcard { padding: .7rem .4rem; gap: .35rem; }
+  .dcard b { overflow-wrap: anywhere; }
+  .dcard .rt { font-size: 1.6rem; font-weight: 700; color: var(--fg); }
+  .dcard.on { border-color: var(--primary); background: hsl(140 70% 55% / .12); box-shadow: 0 0 0 1px var(--primary); }
+  .dcard.on .rt { color: var(--primary); }
+  #draftGo { justify-self: center; height: 2.8rem; padding: 0 2.4rem; background: var(--primary); color: var(--bg); font-weight: 700; letter-spacing: .2em; border-radius: 2px; }
+  #draftGo:disabled { opacity: .35; cursor: default; }
   /* ---------- Mode select + rank ---------- */
   .chip.mode { font-size: .86rem; letter-spacing: .12em; color: var(--muted); }
   .modes { position: fixed; inset: 0; z-index: 85; display: grid; place-items: center; background: hsl(220 18% 4% / .95); padding: 1rem; }
@@ -1296,7 +1305,7 @@ function drop(d, t, rect) {
 }
 
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-player],[data-lane],[data-zone],[data-bench],[data-slot],[data-buy],[data-act],[data-syn],[data-mode],[data-trk],#trkBtn,#rerollBtn,#freezeBtn,#readyBtn,#mapBtn,#fsBtn,#rotateFs,#menuBtn');
+  const t = e.target.closest('[data-player],[data-lane],[data-zone],[data-bench],[data-slot],[data-buy],[data-act],[data-syn],[data-mode],[data-trk],[data-draft],#draftGo,#trkBtn,#rerollBtn,#freezeBtn,#readyBtn,#mapBtn,#fsBtn,#rotateFs,#menuBtn');
   if (!t) { if (S.sel && !e.target.closest('#pop')) { S.sel = null; render(); } return; }
 
   if (t.dataset.player) {
@@ -1325,6 +1334,8 @@ document.addEventListener('click', e => {
     return toggle({ type:'slot', i });
   }
   if (t.dataset.trk) return takeTrinket(t.dataset.trk);
+  if (t.dataset.draft) return toggleDraft(t.dataset.draft);
+  if (t.id === 'draftGo') return finishDraft();
   if (t.id === 'trkBtn') return toggle({ type:'trk' });
   if (t.dataset.buy) return toggle({ type:'shop', i:+t.dataset.buy });
   if (t.dataset.syn) return toggle({ type:'syn', k:t.dataset.syn });
@@ -1356,9 +1367,9 @@ window.addEventListener('resize', () => { sizeRail(); fitNames(); renderPop(); }
 
 
 // Stand-in opponent until real ghosts (other players' saved boards) exist: a team that looks like what a
-// player would have on this day. Runs start empty, so it has 3 commons on day 1, 4 on day 2 and 5 from
-// day 3. Ops come in about as fast as a player can buy them: none on day 1, 2 on day 2, 3 on day 3, all
-// 5 by day 4. One player is upgraded every 2 days (at that day's shop odds), about one gear piece a day;
+// player would have on this day. Runs start with 3 free commons, so it has 3 on day 1, 4 on day 2 and 5
+// from day 3. Ops come in about as fast as a player can buy them: 2 on day 1, then one more a day (all 5
+// by day 4). One player is upgraded every 2 days (at that day's shop odds), about one gear piece a day;
 // op levels and utility come in slowly.
 let GHOST_TUNE = { upEvery: 2, gearPerDay: .8, lvl2: .03, lvl3: .01, buff: .05 }; // per day: share of op upgrades, utility chance
 function ghostFor(day) {
@@ -1368,7 +1379,7 @@ function ghostFor(day) {
     for (; k >= 0; k--) { const got = list.filter(x => (x[key] || 'common') === RARITIES[k]); if (got.length) return pick(got); }
     return pick(list); };
   const size = Math.min(5, 2 + day), slots = () => [...Array(size).keys()].sort(() => Math.random() - .5);
-  const ups = new Set(slots().slice(0, Math.floor((day - 1) / T.upEvery))), withOp = new Set(slots().slice(0, Math.round(1.5 * (day - 1))));
+  const ups = new Set(slots().slice(0, Math.floor((day - 1) / T.upEvery))), withOp = new Set(slots().slice(0, day + 1));
   const commons = POOL.filter(p => p.rarity === 'common'), used = new Set(S.players.map(p => p.name)), ops = new Set(); // never your own players
   const zones = ZONES.map(z => z.id).sort(() => Math.random() - .5).slice(0, size);
   const team = zones.map((zone, i) => {
@@ -1389,9 +1400,44 @@ function ghostFor(day) {
     role: p.role, rp: p.rp, buff: p.buff, weapon: null, att: [], gear: p.gear }));
 }
 function startRun(mode) {
-  S.players = []; S.slots = [null, null, null, null, null, null];
+  S.players = []; S.draft = null; S.slots = [null, null, null, null, null, null];
   Object.assign(S, { mode, round: 1, wins: 0, losses: 0, hp: LIVES, credits: incomeFor(1), streak: 0, investN: 0, endless: false, duos: {}, trinkets: [], offer: null, freeRerollUsed: false, frozen: false, sel: null });
-  rollShop(); render();
+  rollShop(); rollDraft(); render(); showDraft();
+}
+
+/* ---------- Starting draft: a new run offers 5 random commons; you keep 3 for free ---------- */
+const DRAFT_SIZE = 5, DRAFT_KEEP = 3;
+function rollDraft() {
+  const commons = POOL.filter(p => p.rarity === 'common').sort(() => Math.random() - .5);
+  S.draft = { names: commons.slice(0, DRAFT_SIZE).map(p => p.name), picked: [] };
+}
+function showDraft() {
+  const d = S.draft, n = d.picked.length;
+  $('drop').innerHTML = `<div class="box"><h2>PICK ${DRAFT_KEEP} PLAYERS</h2><div class="sub">Free to start · ${n}/${DRAFT_KEEP} picked</div>
+    <div class="tcards draft">${d.names.map(name => { const p = POOL.find(x => x.name === name);
+      return `<button class="tcard dcard ${d.picked.includes(name) ? 'on' : ''}" style="--tc:var(--r-common)" data-draft="${esc(name)}">
+        <b>${esc(name)}</b><span class="rt">${p.rating.toFixed(2)}</span><span>${esc(p.role)}</span>
+        <span>${p.passives.length ? p.passives.join(' · ') : '&nbsp;'}</span></button>`; }).join('')}</div>
+    <button id="draftGo" ${n === DRAFT_KEEP ? '' : 'disabled'}>START</button></div>`;
+  $('drop').hidden = false;
+}
+function toggleDraft(name) {
+  const d = S.draft, i = d.picked.indexOf(name);
+  if (i >= 0) d.picked.splice(i, 1); else if (d.picked.length < DRAFT_KEEP) d.picked.push(name);
+  showDraft();
+}
+// Each pick goes to the lane of its role if that's free (those are placed first), otherwise the first free lane. No ops yet.
+function finishDraft() {
+  if (S.draft?.picked.length !== DRAFT_KEEP) return;
+  const free = ZONES.map(z => z.id);
+  const picks = S.draft.picked.map(n => POOL.find(x => x.name === n))
+    .sort((a, b) => free.includes(b.role) - free.includes(a.role)); // players with their own lane go first
+  for (const p of picks) {
+    const zone = free.includes(p.role) ? p.role : free[0];
+    free.splice(free.indexOf(zone), 1);
+    S.players.push({ ...p, id: p.id + Math.random().toString(36).slice(2, 6), zone, op: null, buff: null, weapon: null, att: [], gear: [] });
+  }
+  S.draft = null; $('drop').hidden = true; render(); saveRun();
 }
 
 /* ---------- Trinket picks ---------- */
@@ -1487,7 +1533,8 @@ if (!S.mode) {
   let start = null; try { start = localStorage.getItem('battler.start'); localStorage.removeItem('battler.start'); } catch {}
   if (start === 'casual' || start === 'ranked') startRun(start);
   else { RUN_ENDED = true; location.replace('menu.html'); throw new Error('to the menu'); }
-} else if (S.offer) showDrop();
+} else if (S.draft) showDraft();
+else if (S.offer) showDrop();
 if (S.pendingToast) { toast(S.pendingToast); S.pendingToast = null; }
 saveRun(); SYNC.backup(); // back up the run (with this fight's result applied) on the server
 Promise.all(Object.keys(OPS).map(k => fetch(`ops/${k}.svg`).then(r => r.text())
