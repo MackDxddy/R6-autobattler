@@ -33,16 +33,20 @@ export const onRequestPost = handle(async ({ request, env }) => {
   const win = !!sim.ev[sim.ev.length - 1].win;
 
   const wins = r.wins + (win ? 1 : 0), losses = r.losses + (win ? 0 : 1), hp = win ? r.hp : Math.max(0, r.hp - lossCost(r.round));
-  let status = r.status, scored = null;
-  if (status === 'live' && (hp <= 0 || wins >= RUN_WIN)) {
-    scored = await scoreRun(env, me.id, wins);
-    status = wins >= RUN_WIN && hp > 0 ? 'won' : 'done';
-  } else if (status === 'won' && hp <= 0) status = 'done'; // Endless ran out of lives (already scored)
-  // One fight per round: this fails if another request already moved the run on
+  let status = r.status;
+  const ends = status === 'live' && (hp <= 0 || wins >= RUN_WIN); // the run is scored now
+  if (ends) status = wins >= RUN_WIN && hp > 0 ? 'won' : 'done';
+  else if (status === 'won' && hp <= 0) status = 'done'; // Endless ran out of lives (already scored)
+  // One fight per round: this fails if another request already moved the run on (or quit it)
   const up = await env.DB.prepare(
-    `UPDATE runs SET round = round + 1, wins = ?, losses = ?, hp = ?, status = ?, rp_delta = COALESCE(?, rp_delta), updated_at = ?
-     WHERE id = ? AND round = ?`).bind(wins, losses, hp, status, scored?.delta ?? null, Date.now(), r.id, r.round).run();
+    `UPDATE runs SET round = round + 1, wins = ?, losses = ?, hp = ?, status = ?, updated_at = ?
+     WHERE id = ? AND round = ? AND status = ?`).bind(wins, losses, hp, status, Date.now(), r.id, r.round, r.status).run();
   if (!up.meta.changes) return fail(409, 'Out of step');
+  let scored = null;
+  if (ends) {
+    scored = await scoreRun(env, me.id, wins);
+    await env.DB.prepare('UPDATE runs SET rp_delta = ? WHERE id = ?').bind(scored.delta, r.id).run();
+  }
 
   await env.DB.prepare('INSERT INTO boards (player_id, mode, round, wins, losses, team, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
     .bind(me.id, 'ranked', r.round, r.wins, r.losses, JSON.stringify(team.map(({ pid, ...p }) => p)), Date.now()).run();

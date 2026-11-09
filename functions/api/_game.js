@@ -41,5 +41,15 @@ export async function scoreRun(env, playerId, wins) {
   return { rp, peak, runs, delta: rp - p.rp };
 }
 
+// Close a run (quit, or replaced by a new one). Only the request whose update actually flips the status
+// scores it, so two requests at once can't both take RP. A 'live' run is scored at its wins; 'won' already was.
+export async function closeRun(env, playerId, r) {
+  if (r.status === 'done') return;
+  const up = await env.DB.prepare("UPDATE runs SET status = 'done', updated_at = ? WHERE id = ? AND status = ?").bind(Date.now(), r.id, r.status).run();
+  if (!up.meta.changes || r.status !== 'live') return;
+  const s = await scoreRun(env, playerId, r.wins);
+  await env.DB.prepare('UPDATE runs SET rp_delta = ? WHERE id = ?').bind(s.delta, r.id).run();
+}
+
 export const profileOf = (env, playerId) => env.DB.prepare('SELECT rp, peak, runs FROM players WHERE id = ?').bind(playerId).first();
 export const runView = r => ({ id: r.id, round: r.round, wins: r.wins, losses: r.losses, hp: r.hp, status: r.status });
