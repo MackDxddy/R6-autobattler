@@ -12,8 +12,8 @@ window.SYNC = (() => {
   async function call(method, path, body, opts = {}) {
     const u = user(), headers = { 'content-type': 'application/json' };
     if (u?.token) headers.authorization = `Bearer ${u.id}.${u.token}`;
-    const res = await fetch('/api/' + path, { method, headers, body: body && JSON.stringify(body), keepalive: !!opts.keepalive });
-    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.status);
+    const res = await fetch('/api/' + path, { method, headers, body: body && JSON.stringify(body), keepalive: !!opts.keepalive, signal: opts.signal });
+    if (!res.ok) { const e = new Error((await res.json().catch(() => ({}))).error || res.status); e.status = res.status; throw e; }
     return res.json();
   }
 
@@ -53,5 +53,23 @@ window.SYNC = (() => {
     } catch { return null; } finally { clearTimeout(timer); }
   }
 
-  return { register, rename, backup, board, opponent };
+  // Ranked runs live on the server: ranked('start'), ranked('fight', {...}), ranked('quit', { run }).
+  // Throws when offline or refused (error.status: 400 bad team, 409 run out of step); nothing is faked offline.
+  async function ranked(what, body = {}, opts = {}) {
+    const u = await register(); if (!u?.token) throw new Error('offline');
+    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), opts.ms || 8000);
+    try { return await call('POST', 'ranked/' + what, body, { ...opts, signal: ctl.signal }); } finally { clearTimeout(timer); }
+  }
+  // Rank from the server (it scores ranked runs), copied into this device's profile. Returns it, or null offline.
+  async function profile() {
+    const u = await register(); if (!u?.token) return null;
+    try {
+      const me = await call('GET', 'me');
+      if (me.profile) localStorage.setItem('battler.profile', JSON.stringify({ ...get('battler.profile'), ...me.profile }));
+      return me.profile;
+    } catch { return null; }
+  }
+  const leaderboard = () => call('GET', 'leaderboard');
+
+  return { register, rename, backup, board, opponent, ranked, profile, leaderboard };
 })();

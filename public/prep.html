@@ -366,6 +366,7 @@
 <script src="sync.js"></script>
 <script src="runmenu.js"></script>
 <script src="pool.js"></script>
+<script src="rules.js"></script>
 <script>
 // One run per account (the browser stands in for the account until there are logins).
 // The page opened last owns the run; any other open page locks so two pages can't overwrite each other.
@@ -389,22 +390,7 @@ const GADGET = f => `items/${f}`;
 const REROLL_ICON = '<svg class="i" viewBox="0 0 24 24"><path d="M12 4a8 8 0 0 1 7.4 5H22l-3.5 4L15 9h2.2A6 6 0 0 0 6 12H4a8 8 0 0 1 8-8zm-6.5 7L9 15H6.8A6 6 0 0 0 18 12h2a8 8 0 0 1-15.4 3H2z"/></svg>';
 const SILHOUETTE = '<svg class="sil" viewBox="0 0 24 24"><path d="M12 2.5c3 0 5.2 2 5.2 5v1.3c0 2.9-2.3 5.2-5.2 5.2s-5.2-2.3-5.2-5.2V7.5c0-3 2.2-5 5.2-5zM4 21.5c.4-3.8 3.6-6.3 8-6.3s7.6 2.5 8 6.3z"/></svg>';
 
-const OPS = {
-  ash:['Ash','Entry'], thermite:['Thermite','Entry'], hibana:['Hibana','Entry'], ace:['Ace','Entry'], blackbeard:['Blackbeard','Entry'],
-  buck:['Buck','Flank'], dokkaebi:['Dokkaebi','Flank'], deimos:['Deimos','Flank'], nomad:['Nomad','Flank'],
-  thatcher:['Thatcher','Support'], twitch:['Twitch','Support'], grim:['Grim','Support'],
-  mute:['Mute','Anchor'], smoke:['Smoke','Anchor'], azami:['Azami','Anchor'], jager:['Jäger','Anchor'], warden:['Warden','Anchor'], kaid:['Kaid','Anchor'],
-  goyo:['Goyo','Anchor'], vigil:['Vigil','Roam'], lesion:['Lesion','Roam'], caveira:['Caveira','Roam'], solis:['Solis','Roam'], ela:['Ela','Roam'],
-};
-const ZONES = [
-  { id:'Entry',   info:'Pushes into their Anchor.' },
-  { id:'Anchor',  info:'Holds against their Entry.' },
-  { id:'Flank',   info:'Fights their Roam for picks.' },
-  { id:'Roam',    info:'Hunts their Flank.' },
-  { id:'Support', info:'Backs up one lane.' },
-];
 const EMPTY_WARN = { Entry:'No pressure on their Anchor', Anchor:'Their Entry walks in', Flank:'Their Roam is free', Roam:'Their Flank walks in', Support:'No lane boost' };
-const MAP_MODS = { Anchor:+10, Flank:-5 };
 const PASSIVES = {
   'Clutch Gene': ['CG', 'Stronger when last alive.'],
   'Opener':      ['OP', 'Wins the opening duel more often.'],
@@ -443,7 +429,6 @@ const ROLE_PASSIVES = {
 // Recurring scaling (kept all run, grows between battles):
 //  Mastery: every battle a player plays makes their role passive stronger.
 //  Duos: two roles fighting together build stacks every battle they both play; stacks stay if the pair splits up.
-const MASTERY = { per: .08, cap: 10 };
 const DUOS = [
   { id: 'call',  a: 'IGL',    b: 'Entry',   to: ['Entry'],         short: 'CP', name: 'Called Push',  per: .03,  cap: 8, info: v => `Entry +${pct(v)} damage.` },
   { id: 'trade', a: 'Entry',  b: 'Support', to: ['Entry'],         short: 'TK', name: 'Trade Kit',    per: 8,    cap: 8, info: v => `Entry +${Math.round(v)} HP.` },
@@ -495,21 +480,6 @@ function duoCast(d, team) {
   return team.filter(p => d.to.includes(roleOf(p)));
 }
 const ROLE_ZONE = { Entry: 'Entry', Anchor: 'Anchor', Flank: 'Flank', Roam: 'Roam' };
-const ROLE_LIST = ['IGL', 'Entry', 'Anchor', 'Flank', 'Roam', 'Support', 'Flex'];
-function pickRole(roles, st) {
-  const role = roles.includes('IGL') ? 'IGL' : roles.find(r => ROLE_LIST.includes(r)) || 'Flex';
-  const { hs, ent, srv, clutch, wr, kd, rating } = st;
-  const rp = {
-    IGL:     hs >= 55 ? 'aim' : ent >= 0 ? 'tempo' : 'reload',
-    Roam:    srv >= 36 ? 'ghost' : kd >= 1.1 ? 'hunter' : 'lurker',
-    Entry:   ent >= 15 ? 'first' : hs >= 55 ? 'flash' : 'space',
-    Anchor:  srv >= 36 ? 'hold' : clutch >= 8 ? 'lastline' : 'digin',
-    Support: srv >= 36 ? 'medic' : wr >= .6 ? 'quarter' : 'ammo',
-    Flank:   hs >= 55 ? 'crossfire' : ent >= 0 ? 'pincer' : 'pressure',
-    Flex:    rating >= 1.1 ? 'fill' : wr >= .6 ? 'glue' : 'adapt',
-  }[role];
-  return { role, rp };
-}
 // Short versions for the popovers: passive name + effect, gun name + damage + RPM
 const rpShort = (p, zone) => {
   const P = ROLE_PASSIVES[p.rp], z = ROLE_ZONE[P.role], half = z && zone && zone !== 'bench' && zone !== z;
@@ -596,42 +566,7 @@ const rpLine = (p, zone) => {
 };
 // Rarity belongs to the player, not the season: one career score from every season (role-weighted stats, sample size,
 // career length). See build_rarity.py. Falls back to rating only for a player missing from the data.
-const RAR = { c: 'common', r: 'rare', e: 'epic', l: 'legendary' };
-// exact name first, then without trailing digits (rosters say "soulz1", stats say "soulz")
-const impactOf = name => { const R = window.RARITY || {}, n = name.toLowerCase(); return R[n] || R[n.replace(/\d+$/, '')]; };
-const rarityOf = (r, name, year) => { const x = impactOf(name); return x ? RAR[x[0]] : r >= 1.17 ? 'legendary' : r >= 1.10 ? 'epic' : r >= 1.02 ? 'rare' : 'common'; };
-const COST = { common:2, rare:3, epic:5, legendary:7 };
 
-function P(name, year, rating, kd, entry, srv, clutch, plants, hs, atk, def, roles, wr) {
-  const passives = [];
-  const ent = parseInt(entry.match(/\(([+-]\d+)\)/)[1], 10);
-  if (clutch >= 10) passives.push('Clutch Gene');
-  if (ent >= 20) passives.push('Opener');
-  if (hs >= 58) passives.push('Headhunter');
-  if (srv >= 36) passives.push('Survivor');
-  if (plants >= 25) passives.push('Closer');
-  if (wr >= .68) passives.push('Winner');
-  const [k, d] = kd.split('-').map(Number);
-  const { role, rp } = pickRole(roles, { hs, ent, srv, clutch, wr, kd: k / Math.max(1, d), rating });
-  return { id: name + year, name, year, rating, kd, entry, srv, clutch, hs, mains:[atk, def], roles, wr, role, rp,
-           rarity: rarityOf(rating, name, year), passives: passives.slice(0, 2), mastery: 0, op: null, zone: null, buff: null, weapon: null, att: [], gear: [] };
-}
-
-const POOL_FALLBACK = [
-  P('Nina',2024,1.23,'389-263','62-36 (+26)',36,6,3,56,'dokkaebi','warden',['Entry'],.565),
-  P('Levy',2025,1.01,'354-346','66-54 (+12)',29,2,3,60,'grim','warden',['Flex'],.40),
-  P('Reeps96',2024,1.19,'569-423','115-81 (+34)',33,16,5,51,'buck','mute',['Flex'],.696),
-  P('Gotti',2024,1.17,'153-118','22-9 (+13)',47,6,26,54,'ace','mute',['Support'],.65),
-  P('Woogiman',2025,1.01,'301-290','41-47 (-6)',35,13,14,52,'blackbeard','smoke',['Flex','IGL'],.646),
-  P('Jigsaw',2025,1.15,'244-200','58-23 (+35)',25,2,0,59,'nomad','azami',['Entry'],.636),
-  P('Slater',2025,1.18,'160-125','22-10 (+12)',29,0,3,52,'deimos','smoke',['Flex'],.667),
-  P('Mephi',2025,1.01,'398-375','49-55 (-6)',33,11,9,41,'ash','smoke',['Flex'],.543),
-  P('yass',2024,1.14,'266-202','34-26 (+8)',41,5,4,57,'ash','lesion',['Flex'],.646),
-];
-// Shop players: every Tier 1 pro from pool.js (build_pool.py); the short list above is only a fallback
-const POOL = (window.POOL_DATA || []).length ? window.POOL_DATA.map(a => P(...a)) : POOL_FALLBACK;
-// Guns: every primary in R6 Manager's data [type, damage, RPM (0 = pump/bolt), magazine]. Any gun on anyone; it replaces their op's gun and is kept.
-const WEAPONS = {"L85A2":["AR",47,670,31],"AR33":["AR",40,749,26],"G36C":["AR",38,780,31],"R4-C":["AR",39,860,31],"556XI":["AR",43,690,31],"F2":["AR",37,980,26],"AK-12":["AR",45,850,31],"AUG A2":["AR",38,750,31],"552 Commando":["AR",43,690,26],"416-C Carbine":["AR",38,740,26],"C8-SFW":["AR",40,837,31],"Mk17 CQB":["AR",48,585,21],"PARA-308":["AR",48,650,31],"TYPE-89":["AR",40,850,21],"C7E":["AR",46,800,31],"M762":["AR",45,730,26],"V308":["AR",44,700,51],"Spear .308":["AR",42,700,31],"M4":["AR",44,750,31],"AK-74M":["AR",44,650,31],"ARX200":["AR",47,700,21],"F90":["AR",38,780,31],"Commando 9":["AR",36,780,26],"SC3000K":["AR",45,860,26],"POF-9":["AR",35,740,51],"PCX-33":["AR",36,800,31],"FMG-9":["SMG",34,800,26],"MP5K":["SMG",30,800,21],"UMP45":["SMG",38,600,26],"MP5":["SMG",27,800,31],"P90":["SMG",22,970,51],"9x19VSN":["SMG",34,750,31],"MP7":["SMG",32,900,31],"9mm C1":["SMG",45,575,34],"MPX":["SMG",26,830,31],"M12":["SMG",36,550,31],"MP5SD":["SMG",27,800,31],"PDW9":["SMG",34,800,51],"Vector .45 ACP":["SMG",21,1200,26],"T-5 SMG":["SMG",28,900,31],"Scorpion EVO 3 A1":["SMG",23,1080,41],"K1A":["SMG",36,720,31],"Mx4 Storm":["SMG",26,950,26],"AUG A3":["SMG",33,760,31],"UZK50Gi":["SMG",44,700,21],"6P41":["LMG",46,680,101],"G8A1":["LMG",37,850,51],"M249":["LMG",48,650,61],"T-95 LSW":["LMG",43,650,81],"LMG-E":["LMG",44,730,151],"ALDA 5.56":["LMG",35,900,81],"M249 SAW":["LMG",48,650,61],"DP27":["LMG",49,550,71],"417":["DMR",69,450,21],"OTs-03":["DMR",72,200,11],"CAMRS":["DMR",69,450,21],"SR-25":["DMR",72,260,21],"Mk 14 EBR":["DMR",60,450,21],"AR-15.50":["DMR",72,450,11],"CSRX 300":["DMR",122,0,6],"PMR90A2":["DMR",47,260,11],"M590A1":["SG",48,0,7],"M1014":["SG",34,0,9],"SG-CQB":["SG",53,0,7],"SASG-12":["SG",50,180,9],"M870":["SG",60,0,8],"Super 90":["SG",35,300,9],"SPAS-12":["SG",50,0,7],"SPAS-15":["SG",30,300,7],"SuperNova":["SG",55,0,7],"ITA12L":["SG",50,0,9],"SIX12":["SG",35,200,6],"SIX12 SD":["SG",35,200,6],"FO-12":["SG",25,400,9],"BOSG.12.2":["SG",125,0,2],"ACS12":["SG",69,300,9],"TCSG12":["SG",57,0,6],"SMG-11":["MP",35,1270,17],"Bearing 9":["MP",33,1100,26],"C75 Auto":["MP",35,1000,20],"SMG-12":["MP",25,1270,34],"SPSMG9":["MP",35,1000,16],"Reaper MK2":["MP",33,900,35]};
 const GUN_FILE = {".44 Mag Semi-Auto":[".44_Mag_Semi-Auto",128,74],".44 Vendetta":["44VENDETTA",141,93],"1911 TACOPS":["1911_TACOPS",98,68],"416-C Carbine":["416-C_Carbine",192,73],"417":["417",240,70],"5.7 USG":["5.7_USG",103,74],"552 Commando":["552_Commando",244,78],"556XI":["556xi",240,72],"6P41":["6P41",273,76],"9mm C1":["9mm_C1",278,67],"9x19VSN":["9x19VSN",174,76],"ACS12":["ACS12_PB",210,76],"AK-12":["AK-12",246,74],"AK-74M":["AK-74M",202,74],"ALDA 5.56":["ALDA_5.56",272,66],"AR-15.50":["AR-15.50",226,74],"AR33":["AR33",266,74],"ARX200":["ARX200",250,72],"AUG A2":["AUG_A2",197,72],"AUG A3":["AUG_A3",194,73],"BOSG.12.2":["BOSG.12.2",273,62],"Bailiff 410":["Bailiff_410",92,73],"Bearing 9":["Bearing_9",153,90],"C75 Auto":["C75_Auto",86,75],"C7E":["C7E",244,71],"C8-SFW":["C8-SFW",207,75],"CAMRS":["CAMRS",278,61],"CSRX 300":["CSRX_300",217,52],"Commando 9":["Commando_9",184,74],"D-50":["D-50",132,76],"DP27":["Primary_gun_DP27",290,52],"F2":["F2",190,72],"F90":["F2000",214,94],"FMG-9":["FMG-9",152,73],"FO-12":["FO-12",138,76],"G36C":["G36C",171,74],"G8A1":["G8A1",270,64],"GSh-18":["GSh-18",99,78],"ITA12L":["ITA12L",280,64],"ITA12S":["ITA12S",186,75],"K1A":["K1A",202,73],"Keratos .357":["Keratos_.357",119,76],"L85A2":["L85A2",218,74],"LFP586":["LFP586",144,78],"LMG-E":["LMG-E",158,70],"Luison":["Luison",178,74],"M1014":["M1014",280,59],"M12":["M12",199,74],"M249":["M249",262,71],"M249 SAW":["M249_SAW",272,74],"M4":["M4",234,72],"M45 MEUSOC":["M45_MEUSOC",108,74],"M590A1":["M590A1",280,58],"M762":["M762",236,72],"M870":["M870",264,71],"MP5":["MP5",186,74],"MP5K":["MP5K",196,92],"MP5SD":["MP5SD",204,77],"MP7":["MP7",151,71],"MPX":["MPX",148,74],"Mk 14 EBR":["Mk_14_EBR",264,58],"Mk1 9mm":["Mk1_9mm_BI",110,77],"Mk17 CQB":["Mk17_CQB",218,74],"Mx4 Storm":["Mx4_Storm",185,74],"OTs-03":["OTs-03",268,66],"P-10C":["P-10C",90,76],"P12":["P12",111,77],"P226 Mk 25":["P226_Mk_25",95,73],"P229":["P229",107,78],"P9":["P9",99,76],"P90":["P90",182,74],"PARA-308":["PARA-308",244,76],"PCX-33":["pcx-33",234,67],"PDW9":["PDW9",134,76],"PMM":["PMM",96,76],"PMR90A2":["PMR90A2",268,56],"POF-9":["POF9",258,84],"PRB92":["PRB92",114,78],"Q-929":["Q-929",111,76],"R4-C":["R4-C",214,75],"RG15":["RG15",86,77],"Reaper MK2":["reaper-mk2",90,100],"SASG-12":["SASG-12",224,68],"SC3000K":["F2000",214,94],"SDP 9mm":["SDP_9mm",117,94],"SG-CQB":["SG-CQB",280,63],"SIX12":["SIX12",218,74],"SIX12 SD":["SIX12_SD",224,74],"SMG-11":["SMG-11",142,76],"SMG-12":["SMG-12",152,74],"SPAS-12":["SPAS-12",280,56],"SPAS-15":["SPAS-15",260,74],"SPSMG9":["SPSMG9",132,76],"SR-25":["SR-25",282,67],"Scorpion EVO 3 A1":["Scorpion_EVO_3_A1",230,74],"Spear .308":["Spear_.308",180,76],"Super 90":["Super_90",270,72],"SuperNova":["SuperNova",278,60],"T-5 SMG":["T-5_SMG",136,77],"T-95 LSW":["T-95_LSW",186,76],"TCSG12":["TCSG12",185,73],"TYPE-89":["Type-89",276,71],"UMP45":["UMP45",151,78],"USP40":["USP40",104,77],"UZK50Gi":["uzk50gi",224,65],"V308":["V308",198,74],"Vector .45 ACP":["Vector_.45_ACP",134,78]};
 const GUN_SRC = n => GUN_FILE[n] ? `weapons/${encodeURIComponent(GUN_FILE[n][0])}.png` : '';
 const OP_GUN = {ash:'R4-C', thermite:'556XI', hibana:'TYPE-89', ace:'AK-12', blackbeard:'SR-25', buck:'C8-SFW', dokkaebi:'Mk 14 EBR', mute:'MP5K', smoke:'FMG-9', thatcher:'AR33', lesion:'T-5 SMG', vigil:'K1A', jager:'416-C Carbine', twitch:'F2', grim:'552 Commando', nomad:'AK-74M', deimos:'AK-74M', azami:'9x19VSN', warden:'MPX', goyo:'Vector .45 ACP', kaid:'AUG A3', caveira:'M12', solis:'P90', ela:'Scorpion EVO 3 A1'};
@@ -647,51 +582,7 @@ const BASE_GUN = 'MP5'; // what a player with no op and no bought gun carries (s
 const gunOf = p => p.weapon?.name || OP_GUN[p.op] || BASE_GUN;
 const gunItem = n => ({ id: 'gun:' + n, name: n, gun: true, cost: 3, src: GUN_SRC(n) });
 const gunLine = n => { const [t, , , m] = WEAPONS[n], g = gameGun(n); return `${TYPES[t].name} · <b>${g.dmg}</b> dmg · <b>${g.rpm}</b> rpm · <b>${m}</b> mag · <b>${TYPES[t].reload.toFixed(1)}s</b> reload`; };
-// Attachments stay on the gun they're bought for, one of each; a new gun (or a new op's gun) comes bare.
-const ATTACH = [
-  { id:'ext',  name:'Extended Mag', att:true, cost:2, short:'MAG',  desc:'+50% mag size.' },
-  { id:'comp', name:'Compensator',  att:true, cost:2, short:'COMP', desc:'+5% hit chance.' },
-  { id:'acog', name:'ACOG',         att:true, cost:2, short:'ACOG', desc:'+6% hit at range. -4% up close.' },
-  { id:'grip', name:'Angled Grip',  att:true, cost:2, short:'GRIP', desc:'First shot 80ms faster.' },
-];
-// Gear is permanent and stacks (buy as many as you like). Scaling gear grows after every battle.
-const GEAR = [
-  { id:'kevlar', r:'common',   name:'Kevlar Vest',   gear:true, cost:3, short:'VEST',   desc:'+32 HP. From the 3rd vest, also -5% RPM.' },
-  { id:'plate', r:'common',    name:'Ceramic Plate', gear:true, cost:3, short:'PLATE',  desc:'+10 armor (blocks 10 damage per bullet). -15% fire damage. -2.5% RPM.' },
-  { id:'hollow', r:'epic',   name:'Hollow Points', gear:true, cost:3, short:'HOLLOW', desc:'+40% damage. Armor blocks double.' },
-  { id:'momentum', r:'rare', name:'Momentum',      gear:true, cost:3, short:'MOMENT', desc:'+15% damage per kill.' },
-  { id:'blood', r:'legendary',    name:'Bloodthirst',   gear:true, cost:3, short:'BLOOD',  desc:'Heal 30 HP per kill.' },
-  { id:'fresh', r:'common',    name:'Fresh Mag',     gear:true, cost:3, short:'FRESH',  desc:'+20% damage on the first half of each mag.' },
-  { id:'wind', r:'rare',     name:'Second Wind',   gear:true, cost:3, short:'WIND',   desc:'Below 50% HP: heal 35 and +40% RPM. Once per fight.' },
-  { id:'revenge', r:'common',  name:'Revenge',       gear:true, cost:3, short:'REVENGE', desc:'+35% damage for 3s when a teammate dies.' },
-  { id:'spons', r:'common',    name:'Sponsorship',   gear:true, cost:3, short:'SPONSOR', scale:true, desc:'+¢1 per battle. +¢1 more every 3 battles (max ¢4).' },
-  { id:'shred', r:'epic',    name:'Shred Rounds',  gear:true, cost:3, short:'SHRED',  desc:"Hits also deal 8% of the target's max HP. Halves Thick Skin. One per player." },
-  { id:'thick', r:'common',    name:'Thick Skin',    gear:true, cost:3, short:'SKIN',   desc:'Takes 10% less damage, plus 4% less per hit taken (max 60%). Half as strong vs Shred.' },
-  { id:'cond', r:'epic',     name:'Conditioning',  gear:true, cost:3, short:'COND',   scale:true, desc:'+12 HP. +8 more each battle.' },
-  { id:'vet', r:'legendary',      name:'Veteran',       gear:true, cost:3, short:'VET',    scale:true, desc:'+2 damage. +3 more every 4 kills.' },
-  { id:'iron', r:'rare',     name:'Iron Wall',     gear:true, cost:3, short:'IRON',   scale:true, desc:'+1 armor. +3 more every 4 battles survived.' },
-];
 const itemArt = it => it.short ? `<span class="attx">${it.short}</span>` : `<img src="${it.src || GADGET(it.img)}" alt="">`;
-// Utility is one use per battle, each with one simple effect.
-const ITEMS = [
-  { id:'frag', r:'common',   name:'Frag', img:'Frag_Grenade.png',          cost:2, desc:'May hit their lane player for 35. Blocked by ADS.' },
-  { id:'breach', r:'rare', name:'Breach Charge', img:'R6S_Breach_charge.png', cost:2, desc:'+50% damage vs their Anchor. Blocked by Mute.' },
-  { id:'stun', r:'common',   name:'Stun', img:'Stun_Grenade.png',          cost:2, desc:'Their lane player misses more for 2s. Blocked by ADS and Warden.' },
-  { id:'smoke', r:'common',  name:'Smoke', img:'Smoke_Grenade.png',        cost:2, desc:'Enemies miss more into this lane for 3s. Blocked by ADS and Warden.' },
-  { id:'hot', r:'rare',    name:'Hot Loads',    short:'HOT',   cost:2, desc:'+25% damage.' },
-  { id:'heavy', r:'epic',  name:'Heavy Rounds', short:'HEAVY', cost:2, desc:'+75% damage, -30% RPM.' },
-  { id:'hair', r:'rare',   name:'Hair Trigger', short:'HAIR',  cost:2, desc:'+45% RPM, -10% damage.' },
-  { id:'mags', r:'rare',   name:'Extra Mags',   short:'MAGS',  cost:2, desc:'2x mag size, 50% faster reloads.' },
-  { id:'trauma', r:'common', name:'Trauma Plate', short:'PLATE', cost:2, desc:'+7 armor.' },
-  { id:'steady', r:'common', name:'Steady Aim',   short:'AIM',   cost:2, desc:'+10% hit chance.' },
-  { id:'prize', r:'common',  name:'Prize Money',  short:'PRIZE', cost:2, desc:'+¢4 if they get the most kills on your team.' },
-  { id:'pain', r:'rare',   name:'Painkillers',  short:'PAIN',  cost:2, desc:'-18% damage taken.' },
-  { id:'stim', r:'common',   name:'Stim Pack',  short:'STIM',  cost:2, desc:'+35 HP.' },
-  { id:'adren', r:'rare',  name:'Adrenaline', short:'ADREN', cost:2, desc:'+40% RPM for the first 3s.' },
-  { id:'ap', r:'epic',     name:'AP Rounds',  short:'AP',    cost:2, desc:'Bullets ignore armor.' },
-  { id:'fire', r:'epic',   name:'Incendiary', short:'FIRE',  cost:2, desc:'Hits burn 3% max HP per second for 2s.' },
-  { id:'clay', r:'common',   name:'Claymore', img:'Claymore.png',          cost:2, desc:'May hit the first pusher for 35. Blocked by Grim.' },
-];
 
 /* ---------- Run state ---------- */
 const S = {
@@ -781,18 +672,6 @@ function aimLine(p, zone, idxInZone) {
   const pct = Math.round((why.reduce((a, [, m]) => a * m, 1) - 1) * 100);
   if (!why.length) return '<b>Aim</b> normal';
   return `<b class="${pct >= 0 ? 'up' : 'down'}">Aim ${pct >= 0 ? '+' : ''}${pct}%</b> · ${why.map(([t, m]) => `<span class="${m < 1 ? 'down' : 'up'}">${t}</span>`).join(' · ')}`;
-}
-function power(p, zone, idxInZone) {
-  let v = p.rating * 100;
-  if (!p.op) v *= .85;
-  else {
-    v *= [1, 1, 1.15, 1.35][p.lvl || 1];
-    if (p.mains.includes(p.op)) v *= 1.10;
-    if (OPS[p.op][1] === zone) v *= 1.10;
-  }
-  v *= 1 + (MAP_MODS[zone] || 0) / 100;
-  if (idxInZone >= 2) v *= .85; // crowding: 3rd+ in a lane
-  return Math.round(v);
 }
 const duoLive = d => !!duoCast(d, active());
 const lanePower = z => inLane(z).reduce((a, p, i) => a + power(p, z, i), 0);
@@ -1165,12 +1044,6 @@ function reroll() {
   spend(cost); S.freeRerollUsed = true; S.frozen = false; S.sel = null;
   rollShop(); render();
 }
-// Price by rarity: one step per tier. Gear is permanent, utility lasts one battle so it stays cheap.
-const GEAR_COST = { common: 3, rare: 4, epic: 5, legendary: 6 }, UTIL_COST = { common: 2, rare: 2, epic: 3, legendary: 3 };
-GEAR.forEach(g => g.cost = GEAR_COST[g.r]); ITEMS.forEach(it => it.cost = UTIL_COST[it.r]);
-// Shop rarity odds by day for players and items [common, rare, epic, legendary]: the good stuff gets easier to find later in the run
-const RARITY_ODDS = day => day <= 2 ? [75, 25, 0, 0] : day <= 4 ? [55, 33, 12, 0] : day <= 6 ? [40, 35, 20, 5] : [30, 35, 25, 10];
-const RARITIES = ['common', 'rare', 'epic', 'legendary'];
 function rollShop() {
   const pick = a => a[Math.floor(Math.random() * a.length)];
   const pickRare = (list, key = 'r') => {
@@ -1355,18 +1228,36 @@ document.addEventListener('click', e => {
     if (readying) return;
     // Hand the locked-in board to the battle screen
     const team = active().map(p => ({ pid: p.id, mastery: p.mastery || 0, name: p.name, rarity: p.rarity, op: p.op, lvl: p.op ? p.lvl || 1 : 1, zone: p.zone, pow: power(p, p.zone, inLane(p.zone).indexOf(p)), passives: p.passives, role: p.role, rp: p.rp, buff: p.buff && { name: p.buff.name }, weapon: p.weapon && { name: p.weapon.name }, att: p.att, gear: p.gear.map(x => ({ id: x.id, n: x.n })) }));
-    S.players.forEach(p => { p.buff = null; }); // utility is spent; guns stay
     const duos = Object.fromEntries(DUOS.filter(duoLive).map(d => [d.id, S.duos[d.id] || 0]));
-    SYNC.board({ mode: S.mode, round: S.round, wins: S.wins, losses: S.losses, team }); // future opponent for other players
-    // Opponent: a real board from this round if the server has one (waits up to 2.5s), else an AI board
-    readying = true; $('readyBtn').classList.add('wait');
-    SYNC.opponent(S.round, S.wins).then(real => {
-      const theirs = real && cleanGhost(real.team);
-      const opp = theirs ? { ghost: theirs, ghostName: real.name, ghostW: real.wins, ghostL: real.losses } : { ghost: ghostFor(S.round), ghostName: 'AI' };
-      try { localStorage.setItem('battler.run', JSON.stringify({ round: S.round, wins: S.wins, losses: S.losses, hp: S.hp, endless: !!S.endless, team, ...opp, duos, trinkets: S.trinkets || [] }));
+    // fight: what battle.html plays (team, opponent, and for ranked the server's result)
+    const launch = fight => {
+      S.players.forEach(p => { p.buff = null; }); // utility is spent; guns stay
+      try { localStorage.setItem('battler.run', JSON.stringify({ round: S.round, wins: S.wins, losses: S.losses, hp: S.hp, endless: !!S.endless, team, duos, trinkets: S.trinkets || [], ...fight }));
             localStorage.setItem('battler.save', JSON.stringify({ ...S, sel: null, flash: null, lvlup: null })); } catch {}
       try { localStorage.setItem('battler.phase', 'battle'); localStorage.removeItem('battler.prog'); } catch {}
       location.replace('battle.html?t=' + Date.now()); // fresh copy every time (no stale cache)
+    };
+    readying = true; $('readyBtn').classList.add('wait');
+    const unwait = msg => { readying = false; $('readyBtn').classList.remove('wait'); toast(msg, true); };
+    if (S.mode === 'ranked') {
+      // Ranked: the server picks the opponent and decides the fight. No connection, no ranked fight.
+      (async () => {
+        if (!S.runId) S.runId = (await SYNC.ranked('start')).run.id; // only round 1 gets here (see the load check)
+        return SYNC.ranked('fight', { run: S.runId, round: S.round, team, trinkets: S.trinkets || [], duos });
+      })().then(f => {
+        if (f.profile) { saveProfile({ ...loadProfile(), ...f.profile }); S.rankDelta = f.delta; }
+        launch({ team: f.team, trinkets: f.trinkets, duos: f.duos, wins: f.run.wins - (f.win ? 1 : 0), ghost: f.ghost, ghostName: f.ghostName, ghostW: f.ghostW, ghostL: f.ghostL, verdict: f.win });
+      }).catch(e => {
+        if (e.status === 409) { toRankedLost(); return unwait('Ranked run out of sync. It goes on as casual.'); }
+        unwait(e.status === 400 ? 'The server refused this team' : "Can't reach the server. Ranked needs a connection.");
+      });
+      return;
+    }
+    SYNC.board({ mode: S.mode, round: S.round, wins: S.wins, losses: S.losses, team }); // future opponent for other players
+    // Opponent: a real board from this round if the server has one (waits up to 2.5s), else an AI board
+    SYNC.opponent(S.round, S.wins).then(real => {
+      const theirs = real && cleanGhost(real.team);
+      launch(theirs ? { ghost: theirs, ghostName: real.name, ghostW: real.wins, ghostL: real.losses } : { ghost: ghostFor(S.round, S.players.map(p => p.name)), ghostName: 'AI' });
     });
     return;
   }
@@ -1374,69 +1265,18 @@ document.addEventListener('click', e => {
 window.addEventListener('resize', () => { sizeRail(); fitNames(); renderPop(); });
 
 
-// Stand-in opponent until real ghosts (other players' saved boards) exist: a team that looks like what a
-// player would have on this day. Runs start with 3 free commons, so it has 3 on day 1, 4 on day 2 and 5
-// from day 3. Ops come in about as fast as a player can buy them: 2 on day 1, then one more a day (all 5
-// by day 4). One player is upgraded every 2 days (at that day's shop odds), about one gear piece a day;
-// op levels and utility come in slowly.
-let GHOST_TUNE = { upEvery: 2, gearPerDay: .8, lvl2: .03, lvl3: .01, buff: .05 }; // per day: share of op upgrades, utility chance
-function ghostFor(day) {
-  const T = GHOST_TUNE, pick = a => a[Math.floor(Math.random() * a.length)];
-  const rare = (list, key) => { const odds = RARITY_ODDS(day); let roll = Math.random() * 100, k = 0;
-    while (k < 3 && roll >= odds[k]) roll -= odds[k++];
-    for (; k >= 0; k--) { const got = list.filter(x => (x[key] || 'common') === RARITIES[k]); if (got.length) return pick(got); }
-    return pick(list); };
-  const size = Math.min(5, 2 + day), slots = () => [...Array(size).keys()].sort(() => Math.random() - .5);
-  const ups = new Set(slots().slice(0, Math.floor((day - 1) / T.upEvery))), withOp = new Set(slots().slice(0, day + 1));
-  const commons = POOL.filter(p => p.rarity === 'common'), used = new Set(S.players.map(p => p.name)), ops = new Set(); // never your own players
-  const zones = ZONES.map(z => z.id).sort(() => Math.random() - .5).slice(0, size);
-  const team = zones.map((zone, i) => {
-    let p; do p = ups.has(i) ? rare(POOL, 'rarity') : pick(commons.length >= 5 ? commons : POOL); while (used.has(p.name)); used.add(p.name);
-    if (!withOp.has(i)) return { ...p, zone, op: null, lvl: 1, gear: [], buff: null };
-    const fits = p.mains.filter(o => OPS[o]?.[1] === zone && !ops.has(o));
-    const op = fits[0] || pick(Object.keys(OPS).filter(o => OPS[o][1] === zone && !ops.has(o))); ops.add(op);
-    const r = Math.random(), l3 = Math.max(0, T.lvl3 * (day - 6)), l2 = Math.min(.5, Math.max(0, T.lvl2 * (day - 2)));
-    return { ...p, zone, op, lvl: r < l3 ? 3 : r < l3 + l2 ? 2 : 1, gear: [], buff: null };
-  });
-  for (let i = 0; i < Math.round((day - 1) * T.gearPerDay); i++) {
-    const g = rare(GEAR.filter(x => x.id !== 'spons'), 'r'), p = pick(team);
-    if (g.id === 'shred' && p.gear.some(x => x.id === 'shred')) continue;
-    p.gear.push({ id: g.id, n: Math.floor(Math.random() * day) });
-  }
-  team.forEach(p => { if (Math.random() < Math.min(.4, T.buff * day)) p.buff = { name: rare(ITEMS, 'r').name }; });
-  return team.map(p => ({ name: p.name, rarity: p.rarity, op: p.op, lvl: p.lvl, zone: p.zone, pow: power(p, p.zone, 0), passives: p.passives,
-    role: p.role, rp: p.rp, buff: p.buff, weapon: null, att: [], gear: p.gear }));
-}
 function startRun(mode) {
   S.players = []; S.draft = null; S.slots = [null, null, null, null, null, null];
   Object.assign(S, { mode, round: 1, wins: 0, losses: 0, hp: LIVES, credits: incomeFor(1), streak: 0, investN: 0, endless: false, duos: {}, trinkets: [], offer: null, freeRerollUsed: false, frozen: false, sel: null });
   rollShop(); rollDraft(); render(); showDraft();
+  S.runId = null; S.rankDelta = null;
+  if (mode === 'ranked') SYNC.ranked('start').then(r => { if (S.round === 1 && !S.runId) { S.runId = r.run.id; saveRun(); } }).catch(() => {}); // else READY starts it
 }
+// A ranked run the server can't follow (started before ranked was checked there, or out of step) goes on as casual
+function toRankedLost() { S.mode = 'casual'; S.runId = null; saveRun(); render(); }
 
 /* ---------- Real opponents ---------- */
 let readying = false; // READY pressed, waiting for the opponent
-// A board from another player, rebuilt from this game's own tables. Players or values the game doesn't know
-// are dropped, and each player's power is worked out here instead of trusting the upload.
-function cleanGhost(team) {
-  if (!Array.isArray(team)) return null;
-  const zones = ZONES.map(z => z.id), gearIds = new Set(GEAR.map(g => g.id)), attIds = new Set(ATTACH.map(a => a.id));
-  const items = new Set(ITEMS.map(i => i.name)), seen = new Set(), lane = {}, out = [];
-  for (const g of team.slice(0, 5)) {
-    const base = g && POOL.find(p => p.name === g.name);
-    if (!base || seen.has(base.name) || !zones.includes(g.zone)) continue;
-    seen.add(base.name);
-    const op = OPS[g.op] ? g.op : null, lvl = op ? Math.min(3, Math.max(1, g.lvl | 0 || 1)) : 1;
-    let shred = false;
-    const gear = (Array.isArray(g.gear) ? g.gear : []).filter(x => gearIds.has(x?.id) && (x.id !== 'shred' || !shred && (shred = true)))
-      .slice(0, 8).map(x => ({ id: x.id, n: Math.min(60, Math.max(0, x.n | 0)) }));
-    const idx = (lane[g.zone] = (lane[g.zone] ?? -1) + 1);
-    out.push({ name: base.name, rarity: base.rarity, role: base.role, rp: base.rp, passives: base.passives, zone: g.zone, op, lvl,
-      mastery: Math.min(MASTERY.cap, Math.max(0, g.mastery | 0)), pow: power({ ...base, op, lvl }, g.zone, idx),
-      buff: items.has(g.buff?.name) ? { name: g.buff.name } : null, weapon: WEAPONS[g.weapon?.name] ? { name: g.weapon.name } : null,
-      att: [...new Set((Array.isArray(g.att) ? g.att : []).filter(a => attIds.has(a)))].slice(0, 4), gear });
-  }
-  return out.length ? out : null;
-}
 
 /* ---------- Starting draft: a new run offers 5 random commons; you keep 3 for free ---------- */
 const DRAFT_SIZE = 5, DRAFT_KEEP = 3;
@@ -1510,10 +1350,9 @@ function afterBattle(r) {
   if (S.hp <= 0 || (S.wins >= 10 && !S.endless) || r.end) {
     const text = S.wins >= 10 ? `RUN WON${S.endless ? ' · ENDLESS' : ''} · ${S.wins}-${S.losses}` : `RUN OVER · ${S.wins}-${S.losses}`;
     let delta = null;
-    if (S.mode === 'ranked') {
-      const P = loadProfile(), before = P.rp;
-      P.rp = Math.max(RP_FLOOR, P.rp + rpDelta(S.wins, P.rp)); delta = P.rp - before;
-      P.peak = Math.max(P.peak, P.rp); P.runs++; saveProfile(P);
+    if (S.mode === 'ranked' && S.runId) {
+      if (S.rankDelta != null) delta = S.rankDelta; // scored by the server at the fight that ended it (profile already saved)
+      else SYNC.ranked('quit', { run: S.runId }, { keepalive: true }).catch(() => {}); // ended by hand (END RUN in Endless)
     }
     RUN_ENDED = true; localStorage.removeItem('battler.save');
     localStorage.setItem('battler.over', JSON.stringify({ text, delta }));
@@ -1568,6 +1407,7 @@ if (!S.mode) {
   else { RUN_ENDED = true; location.replace('menu.html'); throw new Error('to the menu'); }
 } else if (S.draft) showDraft();
 else if (S.offer) showDrop();
+if (S.mode === 'ranked' && !S.runId && S.round > 1) { toRankedLost(); S.pendingToast = "Old ranked run. It's casual now."; }
 if (S.pendingToast) { toast(S.pendingToast); S.pendingToast = null; }
 saveRun(); SYNC.backup(); // back up the run (with this fight's result applied) on the server
 Promise.all(Object.keys(OPS).map(k => fetch(`ops/${k}.svg`).then(r => r.text())

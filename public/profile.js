@@ -39,7 +39,10 @@ function quitRun() {
     const P = loadProfile(), before = P.rp;
     P.rp = Math.max(RP_FLOOR, P.rp + rpDelta(run.wins, P.rp)); delta = P.rp - before;
     P.peak = Math.max(P.peak, P.rp); P.runs++; saveProfile(P);
+    // The server scores it too (its RP is the real one; the menu copies it back)
+    if (run.runId && window.SYNC) SYNC.ranked('quit', { run: run.runId }, { keepalive: true }).catch(() => {});
   }
   ['battler.save', 'battler.run', 'battler.result', 'battler.phase', 'battler.prog'].forEach(k => { try { localStorage.removeItem(k); } catch {} });
   return { text: `RUN QUIT · ${run.wins}-${run.losses}`, delta };
 }
+globalThis.RANKED = { RANKS, RP_FLOOR, RP_START, RP_TABLE, RP_TAX, rankOf, rpDelta }; // the server scores ranked runs with these

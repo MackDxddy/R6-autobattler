@@ -1,9 +1,11 @@
-// GET /api/me -> {id, name}.  PATCH /api/me {name} -> {id, name}
+// GET /api/me -> {id, name, profile: {rp, peak, runs}, run: ranked run in progress or null}.  PATCH /api/me {name} -> {id, name}
 import { json, fail, NAME_RULE, readJson, player, handle } from './_lib.js';
 
 export const onRequestGet = handle(async ({ request, env }) => {
   const p = await player(request, env);
-  return json({ id: p.id, name: p.name });
+  const profile = await env.DB.prepare('SELECT rp, peak, runs FROM players WHERE id = ?').bind(p.id).first();
+  const run = await env.DB.prepare("SELECT id, round, wins, losses, hp, status FROM runs WHERE player_id = ? AND status != 'done' ORDER BY id DESC LIMIT 1").bind(p.id).first();
+  return json({ id: p.id, name: p.name, profile, run: run || null });
 });
 
 export const onRequestPatch = handle(async ({ request, env }) => {

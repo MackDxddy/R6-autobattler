@@ -93,6 +93,15 @@
   .last.lost { border-color: var(--danger); }
   .last .plus { color: var(--primary); } .last .minus { color: var(--danger); }
   .rank { display: grid; gap: .45rem; }
+  /* Leaderboard: top 8 fit on one screen, your own place below */
+  .lb { list-style: none; display: grid; gap: .3rem; }
+  .lb li { display: flex; align-items: baseline; gap: .7rem; font-size: .9rem; }
+  .lb li.me { color: var(--accent); }
+  .lb .pl { width: 1.8rem; color: var(--muted); text-align: right; }
+  .lb .nm { flex: 1; min-width: 0; color: var(--hi); font-weight: 700; }
+  .lb li.me .nm { color: var(--accent); }
+  .lb .rk { font-size: .78rem; letter-spacing: .08em; font-weight: 700; }
+  .lb .pts { width: 4.2rem; text-align: right; color: var(--muted); }
   .rankRow { display: flex; align-items: center; gap: .7rem; }
   .rhex { width: 2.4rem; height: 2.2rem; clip-path: polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0 50%); background: var(--rk);
     display: grid; place-items: center; color: var(--bg); font-weight: 700; font-size: .95rem; }
@@ -183,6 +192,14 @@
     <div class="row"><button class="btn" data-back>BACK</button></div>
   </section>
 
+  <!-- Leaderboard -->
+  <section class="panel" id="vBoard" hidden>
+    <h2>LEADERBOARD</h2>
+    <ol class="lb" id="lb"></ol>
+    <div class="mut" id="lbMe"></div>
+    <div class="row"><button class="btn" data-back>BACK</button></div>
+  </section>
+
   <!-- Settings -->
   <section class="panel" id="vSettings" hidden>
     <h2>SETTINGS</h2>
@@ -226,12 +243,12 @@ const saveSetting = (k, v) => { try { localStorage.setItem(SETTINGS_KEY, JSON.st
 // The finished run's result, left by prep.html; shown once on the home screen
 let over = get('battler.over'); try { localStorage.removeItem('battler.over'); } catch {}
 
-const VIEWS = ['vLogin', 'vHome', 'vModes', 'vSettings'];
+const VIEWS = ['vLogin', 'vHome', 'vModes', 'vSettings', 'vBoard'];
 function show(v) {
   if (v !== 'vSettings') confirming = false;
   if (v !== 'vHome') quitting = false;
   VIEWS.forEach(id => $(id).hidden = id !== v);
-  ({ vLogin: renderLogin, vHome: renderHome, vSettings: renderSettings })[v]?.();
+  ({ vLogin: renderLogin, vHome: renderHome, vSettings: renderSettings, vBoard: renderBoard })[v]?.();
   const first = $(v).querySelector('input, .btn.go, .mbtn, .seg button');
   if (matchMedia('(hover: hover)').matches) first?.focus();
 }
@@ -267,7 +284,7 @@ function renderHome() {
   $('rank').innerHTML = rankHTML(loadProfile().rp);
   const run = currentRun();
   $('playBtn').innerHTML = run
-    ? `CONTINUE <small>${run.mode === 'ranked' ? 'RANKED' : 'CASUAL'} · DAY ${run.round} · ${run.wins}-${run.losses} · ♥${run.hp ?? 10}</small>`
+    ? `CONTINUE <small>${run.mode === 'ranked' ? 'RANKED' : 'CASUAL'} · ROUND ${run.round} · ${run.wins}-${run.losses} · ♥${run.hp ?? 10}</small>`
     : 'PLAY';
   // Quit asks once, in place, saying what it costs
   $('quitNote').hidden = !quitting;
@@ -275,11 +292,25 @@ function renderHome() {
     ? `End this run? It counts as finished at ${run.wins} wins for RP.` : "End this run? It can't be undone.";
   $('homeRow').innerHTML = quitting
     ? '<button class="btn" id="quitNo">CANCEL</button><button class="btn danger" id="quitYes">QUIT RUN</button>'
-    : `<button class="btn" id="setBtn">SETTINGS</button>${run ? '<button class="btn danger" id="quitBtn">QUIT RUN</button>' : ''}`;
+    : `<button class="btn" id="setBtn">SETTINGS</button><button class="btn" id="lbBtn">TOP</button>${run ? '<button class="btn danger" id="quitBtn">QUIT RUN</button>' : ''}`;
 }
 let quitting = false;
 // Ends the run (quitRun in profile.js scores a ranked run like a finished one)
 function confirmQuit() { quitting = false; over = quitRun() || over; renderHome(); SYNC.backup(); }
+
+/* ---------- Leaderboard (ranked RP, kept by the server) ---------- */
+const LB_SHOW = 8;
+async function renderBoard() {
+  $('lb').innerHTML = ''; $('lbMe').textContent = 'Loading...';
+  let d; try { d = await SYNC.leaderboard(); } catch { $('lbMe').textContent = "Can't reach the server."; return; }
+  if ($('vBoard').hidden) return;
+  const meName = AUTH.user()?.name, row = (place, name, rp, me) => { const r = rankOf(rp);
+    return `<li class="${me ? 'me' : ''}"><span class="pl">${place}</span><span class="nm">${esc(name)}</span><span class="rk" style="color:${r.color}">${r.label}</span><span class="pts">${rp} RP</span></li>`; };
+  const top = d.top.slice(0, LB_SHOW), inTop = d.me && d.me.place <= LB_SHOW;
+  $('lb').innerHTML = top.map((p, i) => row(i + 1, p.name, p.rp, inTop && i + 1 === d.me.place)).join('')
+    + (d.me && !inTop ? row(d.me.place, d.me.name, d.me.rp, true) : '');
+  $('lbMe').textContent = !top.length ? 'No ranked runs yet.' : d.me ? '' : 'Finish a ranked run to get a place.';
+}
 
 /* ---------- Settings ---------- */
 let confirming = false; // RESET RANK asks once
@@ -304,7 +335,8 @@ async function setFullscreen(on) {
   renderSettings();
 }
 // Rank back to the start. The run in progress, name and settings stay.
-function resetProgress() {
+async function resetProgress() {
+  try { await SYNC.ranked('reset'); } catch { return toast("Can't reach the server", true); } // rank lives on the server
   try { localStorage.removeItem('battler.profile'); } catch {}
   confirming = false; toast('Rank reset'); show('vHome'); SYNC.backup();
 }
@@ -316,6 +348,7 @@ document.addEventListener('click', async e => {
   if (t.dataset.provider) { try { await AUTH.signIn(t.dataset.provider); show('vHome'); } catch (err) { toast(err.message, true); } return; }
   if (t.id === 'playBtn') return currentRun() ? location.replace('prep.html') : show('vModes');
   if (t.id === 'setBtn') return show('vSettings');
+  if (t.id === 'lbBtn') return show('vBoard');
   if (t.id === 'quitBtn') { quitting = true; return renderHome(); }
   if (t.id === 'quitNo') { quitting = false; return renderHome(); }
   if (t.id === 'quitYes') return confirmQuit();
@@ -333,11 +366,12 @@ document.addEventListener('click', async e => {
   if (t.id === 'resetYes') return resetProgress();
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && ($('vModes').hidden === false || $('vSettings').hidden === false)) show('vHome');
+  if (e.key === 'Escape' && ($('vModes').hidden === false || $('vSettings').hidden === false || $('vBoard').hidden === false)) show('vHome');
 });
 
 show(AUTH.user() ? 'vHome' : 'vLogin');
 SYNC.backup(); // registers the guest if needed, then backs up (also covers a run quit from the in-run menu)
+SYNC.profile().then(p => { if (p && !$('vHome').hidden) renderHome(); }); // rank as the server has it
 </script>
 </body>
 </html>
