@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
+<script src="turn.js"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>R6 Autobattler</title>
@@ -29,7 +30,7 @@
     --danger: hsl(0 70% 55%);
     --border: hsl(140 30% 18%);
   }
-  html { font-size: clamp(14px, min(100dvh / 26, 100vw / 54), 21px); }
+  html { font-size: clamp(14px, min(var(--lh, 100dvh) / 26, var(--lw, 100vw) / 54), 21px); }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   [hidden] { display: none !important; }
   html, body { height: 100%; overflow: hidden; overscroll-behavior: none; background: var(--bg); color: var(--fg); }
@@ -42,8 +43,8 @@
     background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,.07) 2px, rgba(0,0,0,.07) 4px),
                 radial-gradient(ellipse at center, transparent 62%, rgba(0,0,0,.45) 100%); }
 
-  .app { height: 100dvh; max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 2.5rem; align-items: center;
-    padding: max(1rem, env(safe-area-inset-top)) max(2rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(2rem, env(safe-area-inset-left)); }
+  .app { height: var(--lh, 100dvh); max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 2.5rem; align-items: center;
+    padding: max(1rem, var(--sa-top, env(safe-area-inset-top))) max(2rem, var(--sa-right, env(safe-area-inset-right))) max(1rem, var(--sa-bottom, env(safe-area-inset-bottom))) max(2rem, var(--sa-left, env(safe-area-inset-left))); }
 
   /* Left: the brand */
   .brand { display: grid; gap: 1rem; justify-items: start; }
@@ -121,7 +122,7 @@
   .toast.show { opacity: 1; } .toast.bad { border-color: var(--danger); color: hsl(0 70% 75%); }
 
   .rotate { display: none; position: fixed; inset: 0; place-items: center; text-align: center; padding: 1.5rem; color: var(--hi); letter-spacing: .25em; font-weight: 700; }
-  @media (orientation: portrait) { .app { display: none !important; } .rotate { display: grid; } }
+  @media (orientation: portrait) { html:not(.turned) .app { display: none !important; } html:not(.turned) .rotate { display: grid; } }
   @media (display-mode: fullscreen), (display-mode: standalone) { #fsLine { display: none !important; } }
 </style>
 </head>

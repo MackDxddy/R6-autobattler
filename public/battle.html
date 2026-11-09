@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
+<script src="turn.js"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Battle Prototype</title>
@@ -33,7 +34,7 @@
     --r-epic: hsl(280 70% 70%);
     --r-legendary: hsl(36 90% 55%);
   }
-  html { font-size: clamp(14px, min(100dvh / 26, 100vw / 54), 21px); }
+  html { font-size: clamp(14px, min(var(--lh, 100dvh) / 26, var(--lw, 100vw) / 54), 21px); }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   [hidden] { display: none !important; }
   html, body { height: 100%; overflow: hidden; overscroll-behavior: none; background: var(--bg); color: var(--fg); }
@@ -48,8 +49,8 @@
   .op svg path:not([fill]) { fill: hsl(140 35% 13%); }
   .theirs .op svg path:not([fill]) { fill: hsl(0 35% 13%); }
 
-  .app { position: relative; height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: .3rem;
-    padding: max(.5rem, env(safe-area-inset-top)) max(.8rem, env(safe-area-inset-right)) max(.5rem, env(safe-area-inset-bottom)) max(.8rem, env(safe-area-inset-left)); }
+  .app { position: relative; height: var(--lh, 100dvh); display: grid; grid-template-rows: auto minmax(0, 1fr); gap: .3rem;
+    padding: max(.5rem, var(--sa-top, env(safe-area-inset-top))) max(.8rem, var(--sa-right, env(safe-area-inset-right))) max(.5rem, var(--sa-bottom, env(safe-area-inset-bottom))) max(.8rem, var(--sa-left, env(safe-area-inset-left))); }
 
   /* ---------- HUD ---------- */
   .hud { display: flex; align-items: center; gap: .8rem; }
@@ -183,7 +184,7 @@
 
   .band { position: absolute; z-index: 8; left: -.8rem; right: -.8rem; top: 50%; translate: 0 -50%; padding: .8rem 0; pointer-events: none;
     display: grid; place-items: center; gap: .2rem; background: hsl(220 18% 6% / .96); border-block: 1px solid var(--accent); animation: band 1.3s ease-out forwards; }
-  .band span { font-size: clamp(1.4rem, 8vh, 3rem); font-weight: 700; letter-spacing: .3em; padding-left: .3em; color: var(--accent); white-space: nowrap; line-height: 1; }
+  .band span { font-size: clamp(1.4rem, calc(var(--lh, 100vh) * 0.08), 3rem); font-weight: 700; letter-spacing: .3em; padding-left: .3em; color: var(--accent); white-space: nowrap; line-height: 1; }
   .band small { font-size: .86rem; letter-spacing: .2em; color: var(--muted); font-weight: 700; }
   .band.won { border-color: var(--primary); } .band.won span { color: var(--primary); }
   .band.lost { border-color: var(--danger); } .band.lost span { color: var(--danger); }
@@ -192,7 +193,7 @@
   /* ---------- Result + recap ---------- */
   .result { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; background: var(--bg); }
   .result .box { display: grid; gap: .9rem; justify-items: center; text-align: center; animation: pop .35s ease-out; }
-  .result h1 { font-size: clamp(2rem, 12vh, 4.4rem); line-height: 1; letter-spacing: .25em; padding-left: .25em; color: var(--primary); text-shadow: 0 0 2rem hsl(140 70% 55% / .35); }
+  .result h1 { font-size: clamp(2rem, calc(var(--lh, 100vh) * 0.12), 4.4rem); line-height: 1; letter-spacing: .25em; padding-left: .25em; color: var(--primary); text-shadow: 0 0 2rem hsl(140 70% 55% / .35); }
   .result.loss h1 { color: var(--danger); text-shadow: 0 0 2rem hsl(0 70% 55% / .35); }
   .rec { display: flex; gap: 2.2rem; }
   .rec > span { display: grid; gap: .25rem; justify-items: center; }
@@ -210,9 +211,9 @@
   .kp.dead .op { opacity: .4; }
   .why { font-size: .9rem; color: var(--hi); max-width: 30rem; } .why b { color: var(--accent); }
   /* Scoreboard (STATS): replaces the record and kill row */
-  .board { display: none; border-collapse: collapse; font-size: clamp(.86rem, 3.7vh, 1.4rem); }
+  .board { display: none; border-collapse: collapse; font-size: clamp(.86rem, calc(var(--lh, 100vh) * 0.037), 1.4rem); }
   .result.stats .board { display: table; } .result.stats .rec, .result.stats .kills { display: none; }
-  .result.stats h1 { font-size: clamp(1.4rem, 7vh, 2.4rem); }
+  .result.stats h1 { font-size: clamp(1.4rem, calc(var(--lh, 100vh) * 0.07), 2.4rem); }
   .board th { font-weight: 700; letter-spacing: .12em; color: var(--muted); padding: .6em 1em .2em; text-align: right; }
   .board th:first-child { text-align: left; color: var(--hi); }
   .board td { padding: .18em 1em; text-align: right; color: var(--fg); font-variant-numeric: tabular-nums; }
@@ -226,7 +227,7 @@
   .btn.go { background: var(--primary); border-color: var(--primary); color: var(--bg); }
   @keyframes pop { from { transform: scale(.85); opacity: 0; } }
 
-  .pop { position: fixed; z-index: 85; width: min(16rem, calc(100vw - 1rem)); background: hsl(220 18% 6%); border: 1px solid var(--accent); border-radius: 2px; padding: .5rem .65rem; display: grid; gap: .25rem; }
+  .pop { position: fixed; z-index: 85; width: min(16rem, calc(var(--lw, 100vw) - 1rem)); background: hsl(220 18% 6%); border: 1px solid var(--accent); border-radius: 2px; padding: .5rem .65rem; display: grid; gap: .25rem; }
   .pop b { color: var(--hi); } .pop .ln { font-size: .86rem; color: var(--muted); } .pop .ln b { color: var(--fg); }
   .pop .ph { display: flex; align-items: baseline; gap: .5rem; } .pop .ph b { font-size: 1.05rem; } .pop .mut { color: var(--muted); font-size: .86rem; }
   .pop .pst { display: flex; flex-wrap: wrap; gap: .2rem .6rem; font-size: .86rem; color: var(--muted); }
@@ -235,7 +236,7 @@
   body.paused .rd::after { content: ' · PAUSED'; color: var(--accent); }
 
   .rotate { display: none; position: fixed; inset: 0; place-items: center; color: var(--hi); letter-spacing: .25em; font-weight: 700; }
-  @media (orientation: portrait) { .app, .result, .pop { display: none !important; } .rotate { display: grid; } }
+  @media (orientation: portrait) { html:not(.turned) .app, html:not(.turned) .result, html:not(.turned) .pop { display: none !important; } html:not(.turned) .rotate { display: grid; } }
   .elsewhere { position: fixed; inset: 0; z-index: 999; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 94%, transparent); }
   .elsewhere > div { display: flex; flex-direction: column; align-items: center; gap: .7rem; text-align: center; }
   .elsewhere .btn { height: 2.6rem; padding: 0 1.2rem; border: 1px solid var(--primary); background: var(--primary); color: var(--bg); font-weight: 700; letter-spacing: .14em; cursor: pointer; }
