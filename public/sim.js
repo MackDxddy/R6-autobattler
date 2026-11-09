@@ -172,7 +172,7 @@ const OT = { at: 9000, tick: 500, gas: .025, dmg: .25 }; // gas: share of max HP
 // A headshot adds a flat chunk on top of the bullet: it kills any normal player outright, but a stacked tank can take one.
 const HS_BONUS = 100;
 // When each position first sees someone (ms into the round)
-const CONTACT_AT = { Entry: 250, Flank: 650, Roam: 650, Anchor: 1000, Support: 1500 };
+const CONTACT_AT = { Entry: 250, Flank: 450, Roam: 450, Anchor: 600, Support: 800 };
 // Standard utility is one use: each throwable goes off once in the round. Guns are kept (u.weapon) and replace the op's own gun.
 const ITEMS = {
   Frag:            { throw: 'frag',   at: 480, label: 'FRAG',          boom: 35, chance: .65, info: 'May hit their lane player for 35. Blocked by ADS.' },
@@ -566,6 +566,7 @@ function simulate(run, ghost) {
       tg = pickTarget(sh);
       sh.tg = tg; sh.jump = tg.tg !== sh;               // they're looking elsewhere: you get the jump on them
       ev.push({ t: 'aim', at: time, from: sh.id, to: tg.id });
+      if (!tg.fired) tg.next = Math.min(tg.next, time + react(tg) * .8 + rng() * 100); // they see the peek and swing back
       sh.next = time + 120; continue;                   // a beat to line up the shot
     }
     // The burst: each bullet rolls to hit, each hit might be a headshot; armor blocks a flat amount per bullet
@@ -586,9 +587,14 @@ function simulate(run, ghost) {
     let hitP = Math.max(.05, Math.min(.92, sh.hit + call(sh, 'aim') + my(sh, 'adapt') + (tg.tg && tg.tg !== sh ? my(sh, 'crossfire') : 0) - (sh.fhUntil > time ? sh.fhV : 0) + TYPES[sh.cls].hit[RANGE[sh.zone]] + sh.acog * (RANGE[sh.zone] === 'close' ? -.04 : .06) + (sh.jump ? .1 : 0) + tg.rev - (sh.conc > time ? .2 : 0) - (sh.blind > time ? .3 : 0) - ((smokeUntil[tg.side][tg.zone] || 0) > time ? .25 : 0) + (sh.zone === 'Anchor' && wall[sh.side] && !breached[sh.side] ? WALL.hit : 0)));
     hitP *= HIT_SCALE;   // one global dial: every bonus and penalty above shrinks with it
     const hsP = sh.hs + (solo(sh) && has(sh, 'Clutch Gene') ? .04 : 0);
-    sh.jump = false;
-    const b = []; let dmg = 0, hs = false, saved = false;
+    sh.jump = false; sh.fired = true;
+    const b = []; let dmg = 0, hs = false, saved = false, cut = false;
+    const gap = 60000 / rpm;
+    // Taking fire wakes a player who hasn't started shooting yet
+    const wakeAt = time + react(tg) * .6 + rng() * 120;
     for (let k = 0; k < shots && dmg < tg.hp; k++) {
+      // A burst stops when its target is ready to fire their first shots, so nobody dies without shooting back
+      if (k > 0 && !tg.fired && time + k * gap > Math.min(tg.next, dmg ? wakeAt : Infinity)) { cut = true; break; }
       if (k === 0 && tg.dodge && rng() < tg.dodge) { b.push(0); continue; }
       if (my(tg, 'ghost') && rng() < my(tg, 'ghost')) { b.push(0); continue; }    // Ghost: slips bullets      // light ops slip the first round
       const roll = rng();
@@ -618,6 +624,8 @@ function simulate(run, ghost) {
       d = Math.min(tg.hp - dmg, d); b.push(Math.max(d, .001)); dmg += d; if (d > 0) tg.hits++;
     }
     dmg = Math.round(dmg);
+    if (cut) { shots = b.length; pause = 30 + rng() * 60; }
+    if (dmg && !tg.fired && tg.hp - dmg > 0) tg.next = Math.min(tg.next, wakeAt);
     tg.hp -= dmg; if (dmg) { tg.by = sh; if (tg.holdArmor) { tg.block -= tg.holdArmor; tg.holdArmor = 0; } if (sh.burn && tg.hp > 0) ignite(sh, tg); }
     ev.push({ t: 'shot', at: time, from: sh.id, to: tg.id, b: b.map(x => x ? Math.round(x) || 1 : 0), cad: Math.round(60000 / rpm), dmg, hs, saved, hp: tg.hp });
     if (tg.wind && !tg.winded && tg.hp > 0 && tg.hp < .5 * tg.maxHp) { // Second Wind
