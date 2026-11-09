@@ -1,13 +1,7 @@
-// Cloudflare Workers config. Deploys the game in public/ as static files.
-// The name must match the Worker's name in the Cloudflare dashboard.
+// Cloudflare Pages config. Only the game in public/ is published (never data/ or tools/).
+// This file overrides the build settings in the Pages dashboard.
 {
   "name": "r6-autobattler",
   "compatibility_date": "2025-09-01",
-  // Serve the game at r6-autobattler.<account>.workers.dev
-  "workers_dev": true,
-  "assets": {
-    "directory": "./public",
-    // Keep .html URLs as they are (no /menu.html -> /menu redirects), so the offline cache works
-    "html_handling": "none"
-  }
+  "pages_build_output_dir": "./public"
 }

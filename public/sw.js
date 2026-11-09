@@ -1,7 +1,7 @@
 // Service worker: lets the game install as an app and run offline.
 // Pages and scripts: network first, so updates show up as soon as you're online; the cache covers offline.
 // Images and icons: cache first (they rarely change). Bump VERSION to force everything to refresh.
-const VERSION = 'v3';
+const VERSION = 'v4';
 const CACHE = `battler-${VERSION}`;
 const CORE = [
   'menu.html', 'prep.html', 'battle.html', 'rarity.js', 'pool.js', 'profile.js', 'auth.js', 'manifest.webmanifest',
@@ -9,7 +9,9 @@ const CORE = [
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE)
+    .then(c => Promise.all(CORE.map(u => fetch(u).then(res => { if (!res.ok) throw new Error(u); return c.put(u, clean(res)); }))))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {
@@ -18,8 +20,11 @@ self.addEventListener('activate', e => {
     .then(() => self.clients.claim()));
 });
 
+// Some hosts redirect menu.html to /menu. A redirected response can't answer a page load, so store a plain copy.
+const clean = res => res.redirected ? new Response(res.body, { status: res.status, statusText: res.statusText, headers: res.headers }) : res;
+
 const put = (req, res) => {
-  if (res.ok || res.type === 'opaque') { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); } // clone now, before the page reads the body
+  if (res.ok || res.type === 'opaque') { const copy = clean(res.clone()); caches.open(CACHE).then(c => c.put(req, copy)); } // clone now, before the page reads the body
   return res;
 };
 

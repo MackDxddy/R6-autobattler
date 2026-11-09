@@ -19,5 +19,5 @@ Then open http://localhost:8080/menu.html
     python tools/make_icons.py     # app icons
 
 ## Hosting
-Cloudflare Workers (static assets), connected to this repo. `wrangler.jsonc` points at `public/`.
+Cloudflare Pages, connected to this repo: https://r6-autobattler.pages.dev. `wrangler.jsonc` sets the output folder to `public/`, so data/ and tools/ are never published.
 Build command: none. Deploy command: `npx wrangler deploy`. Every push to `main` deploys.
