@@ -27,7 +27,7 @@ function rankHTML(rp) {
   const r = rankOf(rp), f = r.hi ? (rp - r.lo) / (r.hi - r.lo) : 1;
   return `<div class="rankRow" style="--rk:${r.color}"><span class="rhex">${ROMAN[r.div] || '★'}</span><span class="rname">${r.label}</span></div>
     <div class="rbar" style="--rk:${r.color}"><i style="width:${Math.round(f * 100)}%"></i></div>
-    <div class="rsub">${fmtK(rp)} RP${r.hi ? ` · ${fmtK(r.hi - rp)} to next division` : ''}</div>`;
+    <div class="rsub">${rp} RP${r.hi ? ` · ${r.hi - rp} to next division` : ''}</div>`;
 }
 
 // Ends the run in progress early (QUIT RUN on the home screen or the in-run menu). A ranked run is scored
