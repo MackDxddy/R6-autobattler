@@ -3,6 +3,8 @@
 <head>
 <script src="turn.js"></script>
 <script src="nav.js"></script>
+<script src="profile.js"></script>
+<script src="runmenu.js"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Battle Prototype</title>
@@ -256,6 +258,7 @@
     <button class="ctl on" id="sndBtn">SFX</button>
     <button class="ctl" id="pauseBtn" title="Pause (space)">❚❚</button>
     <button class="ctl" id="speedBtn" title="Fast forward">▶▶ 1×</button>
+    <button class="ctl" id="menuBtn" title="Menu" aria-label="Menu">☰</button>
   </header>
   <section class="arena" id="arena">
     <div class="map" id="map"></div>
@@ -1456,12 +1459,17 @@ function showPop(u, t) {
 }
 
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-u],#speedBtn,#pauseBtn,#sndBtn,#replayBtn,#statsBtn,#contBtn,#endlessBtn,#newRunBtn');
+  const t = e.target.closest('[data-u],#menuBtn,#speedBtn,#pauseBtn,#sndBtn,#replayBtn,#statsBtn,#contBtn,#endlessBtn,#newRunBtn');
   if (t?.id === 'statsBtn') { const on = $('result').classList.toggle('stats'); t.classList.toggle('on', on); t.textContent = on ? 'BACK' : 'STATS'; return; }
   $('pop').hidden = true;
   // A player's card pauses the fight; closing it resumes, unless you paused with the button yourself
   if (t?.dataset.u) { if (!paused) { setPaused(true); pausedBy = 'card'; } return showPop(U(t.dataset.u), t); }
   if (t?.id === 'pauseBtn') { setPaused(!paused); pausedBy = paused ? 'button' : null; return; }
+  // In-run menu: pauses the fight. MAIN MENU leaves it pending (CONTINUE comes back to this moment).
+  if (t?.id === 'menuBtn') {
+    const was = paused; setPaused(true);
+    return RUNMENU.open({ onClose: () => setPaused(was), beforeMenu: saveProg, beforeQuit: () => { NOT_OWNER = true; } }); // NOT_OWNER: stop saving fight progress
+  }
   if (pausedBy === 'card') { setPaused(false); pausedBy = null; }
   if (!t) return;
   if (t.id === 'sndBtn') { t.classList.toggle('on', sfx.toggle()); return; }

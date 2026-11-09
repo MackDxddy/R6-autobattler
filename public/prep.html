@@ -363,6 +363,7 @@
 <script src="rarity.js"></script>
 <script src="profile.js"></script>
 <script src="sync.js"></script>
+<script src="runmenu.js"></script>
 <script src="pool.js"></script>
 <script>
 // One run per account (the browser stands in for the account until there are logins).
@@ -1343,7 +1344,7 @@ document.addEventListener('click', e => {
   if (t.dataset.act === 'sell') return sellPlayer(selPlayer());
   if (t.dataset.act === 'sellop') return sellOp(S.sel.i);
   if (t.id === 'fsBtn' || t.id === 'rotateFs') return goFullscreen();
-  if (t.id === 'menuBtn') { saveRun(); location.replace('menu.html'); return; } // the run is saved; CONTINUE picks it up
+  if (t.id === 'menuBtn') return RUNMENU.open({ beforeMenu: saveRun, beforeQuit: () => { RUN_ENDED = true; } }); // MAIN MENU saves; CONTINUE picks it up
   if (t.id === 'mapBtn') return toggle({ type:'map' });
   if (t.id === 'rerollBtn') return reroll();
   if (t.id === 'freezeBtn') { S.frozen = !S.frozen; return render(); }

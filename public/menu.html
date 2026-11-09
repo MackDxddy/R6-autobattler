@@ -278,20 +278,8 @@ function renderHome() {
     : `<button class="btn" id="setBtn">SETTINGS</button>${run ? '<button class="btn danger" id="quitBtn">QUIT RUN</button>' : ''}`;
 }
 let quitting = false;
-// Ends the run in progress. Ranked runs are scored like any finished run (no free escape from a bad one).
-function quitRun() {
-  const run = currentRun(); quitting = false;
-  if (!run) return renderHome();
-  let delta = null;
-  if (run.mode === 'ranked') {
-    const P = loadProfile(), before = P.rp;
-    P.rp = Math.max(RP_FLOOR, P.rp + rpDelta(run.wins, P.rp)); delta = P.rp - before;
-    P.peak = Math.max(P.peak, P.rp); P.runs++; saveProfile(P);
-  }
-  ['battler.save', 'battler.run', 'battler.result', 'battler.phase', 'battler.prog'].forEach(k => { try { localStorage.removeItem(k); } catch {} });
-  over = { text: `RUN QUIT · ${run.wins}-${run.losses}`, delta };
-  renderHome(); SYNC.backup();
-}
+// Ends the run (quitRun in profile.js scores a ranked run like a finished one)
+function confirmQuit() { quitting = false; over = quitRun() || over; renderHome(); SYNC.backup(); }
 
 /* ---------- Settings ---------- */
 let confirming = false; // RESET RANK asks once
@@ -330,7 +318,7 @@ document.addEventListener('click', async e => {
   if (t.id === 'setBtn') return show('vSettings');
   if (t.id === 'quitBtn') { quitting = true; return renderHome(); }
   if (t.id === 'quitNo') { quitting = false; return renderHome(); }
-  if (t.id === 'quitYes') return quitRun();
+  if (t.id === 'quitYes') return confirmQuit();
   if (t.dataset.back !== undefined) return show('vHome');
   if (t.dataset.mode) {
     try { localStorage.setItem('battler.start', t.dataset.mode); } catch {}
@@ -349,7 +337,7 @@ document.addEventListener('keydown', e => {
 });
 
 show(AUTH.user() ? 'vHome' : 'vLogin');
-SYNC.register();
+SYNC.backup(); // registers the guest if needed, then backs up (also covers a run quit from the in-run menu)
 </script>
 </body>
 </html>

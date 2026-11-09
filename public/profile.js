@@ -27,3 +27,19 @@ function rankHTML(rp) {
     <div class="rbar" style="--rk:${r.color}"><i style="width:${Math.round(f * 100)}%"></i></div>
     <div class="rsub">${rp} RP${r.hi ? ` · ${r.hi - rp} to next division` : ''}</div>`;
 }
+
+// Ends the run in progress early (QUIT RUN on the home screen or the in-run menu). A ranked run is scored
+// like a finished run at its current wins, so quitting can't dodge a bad run. Returns { text, delta } for
+// the home screen, or null when there's no run.
+function quitRun() {
+  let run = null; try { run = JSON.parse(localStorage.getItem('battler.save')); } catch {}
+  if (!run?.mode) return null;
+  let delta = null;
+  if (run.mode === 'ranked') {
+    const P = loadProfile(), before = P.rp;
+    P.rp = Math.max(RP_FLOOR, P.rp + rpDelta(run.wins, P.rp)); delta = P.rp - before;
+    P.peak = Math.max(P.peak, P.rp); P.runs++; saveProfile(P);
+  }
+  ['battler.save', 'battler.run', 'battler.result', 'battler.phase', 'battler.prog'].forEach(k => { try { localStorage.removeItem(k); } catch {} });
+  return { text: `RUN QUIT · ${run.wins}-${run.losses}`, delta };
+}
