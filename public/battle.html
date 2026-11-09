@@ -14,6 +14,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="R6 Autobattler">
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});</script>
+<script>addEventListener('pageshow', e => { if (e.persisted) location.reload(); }); // Back/Forward shows a frozen copy; load it fresh so the checks below run</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -267,6 +268,10 @@
 <div class="rotate">ROTATE YOUR DEVICE</div>
 
 <script>
+// A fight only opens when prep started one and its result isn't in yet. Going Back to a finished fight
+// can't replay it for a better result.
+{ let pending = false; try { pending = localStorage.getItem('battler.phase') === 'battle' && !localStorage.getItem('battler.result'); } catch {}
+  if (!pending && !/[?&]demo/.test(location.search)) { location.replace('prep.html'); throw new Error('no fight pending'); } }
 // One run per account (the browser stands in for the account until there are logins).
 // The page opened last owns the run; any other open page locks so two pages can't overwrite each other.
 const PAGE_ID = Math.random().toString(36).slice(2);
@@ -1466,7 +1471,7 @@ document.addEventListener('click', e => {
     try { localStorage.setItem('battler.result', JSON.stringify({ round: RUN.round, win: !!LAST?.win, endless: t.id === 'endlessBtn', end: t.id === 'newRunBtn',
       team: SIM.units.filter(u => u.side === 'mine').map(u => ({ pid: u.pid, kills: u.kills, alive: u.alive, buff: u.buff?.name || null })) })); } catch {}
     try { localStorage.removeItem('battler.prog'); } catch {}
-    location.href = 'prep.html?t=' + Date.now();
+    location.replace('prep.html?t=' + Date.now());
   }
 });
 addEventListener('resize', () => SIM && layout());

@@ -14,6 +14,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="R6 Autobattler">
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});</script>
+<script>addEventListener('pageshow', e => { if (e.persisted) location.reload(); }); // Back/Forward shows a frozen copy; load it fresh so the checks below run</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -301,12 +302,12 @@ document.addEventListener('click', async e => {
   const t = e.target.closest('button'); if (!t) return;
   if (t.id === 'guestBtn') return playAsGuest();
   if (t.dataset.provider) { try { await AUTH.signIn(t.dataset.provider); show('vHome'); } catch (err) { toast(err.message, true); } return; }
-  if (t.id === 'playBtn') return currentRun() ? location.href = 'prep.html' : show('vModes');
+  if (t.id === 'playBtn') return currentRun() ? location.replace('prep.html') : show('vModes');
   if (t.id === 'setBtn') return show('vSettings');
   if (t.dataset.back !== undefined) return show('vHome');
   if (t.dataset.mode) {
     try { localStorage.setItem('battler.start', t.dataset.mode); } catch {}
-    location.href = 'prep.html'; return;
+    location.replace('prep.html'); return;
   }
   const seg = t.closest('.seg[data-set]');
   if (seg) { saveSetting(seg.dataset.set, seg.dataset.set === 'sound' ? t.dataset.v === '1' : +t.dataset.v); return renderSettings(); }

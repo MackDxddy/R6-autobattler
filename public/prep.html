@@ -14,6 +14,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="R6 Autobattler">
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});</script>
+<script>addEventListener('pageshow', e => { if (e.persisted) location.reload(); }); // Back/Forward shows a frozen copy; load it fresh so the checks below run</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -1322,7 +1323,7 @@ document.addEventListener('click', e => {
   if (t.dataset.act === 'sell') return sellPlayer(selPlayer());
   if (t.dataset.act === 'sellop') return sellOp(S.sel.i);
   if (t.id === 'fsBtn' || t.id === 'rotateFs') return goFullscreen();
-  if (t.id === 'menuBtn') { saveRun(); location.href = 'menu.html'; return; } // the run is saved; CONTINUE picks it up
+  if (t.id === 'menuBtn') { saveRun(); location.replace('menu.html'); return; } // the run is saved; CONTINUE picks it up
   if (t.id === 'mapBtn') return toggle({ type:'map' });
   if (t.id === 'rerollBtn') return reroll();
   if (t.id === 'freezeBtn') { S.frozen = !S.frozen; return render(); }
@@ -1335,7 +1336,7 @@ document.addEventListener('click', e => {
     try { localStorage.setItem('battler.run', JSON.stringify({ round: S.round, wins: S.wins, losses: S.losses, hp: S.hp, endless: !!S.endless, team, ghost: ghostFor(S.round), duos, trinkets: S.trinkets || [] }));
           localStorage.setItem('battler.save', JSON.stringify({ ...S, sel: null, flash: null, lvlup: null })); } catch {}
     try { localStorage.setItem('battler.phase', 'battle'); localStorage.removeItem('battler.prog'); } catch {}
-    location.href = 'battle.html?t=' + Date.now(); // fresh copy every time (no stale cache)
+    location.replace('battle.html?t=' + Date.now()); // fresh copy every time (no stale cache)
     return;
   }
 });
