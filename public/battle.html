@@ -1450,8 +1450,9 @@ function showPop(u, t) {
     ${tags.length ? `<div class="ln">${tags.map(esc).join(' · ')}</div>` : ''}`;
   pop.hidden = false;
   const w = pop.offsetWidth, h = pop.offsetHeight;
-  pop.style.left = `${Math.min(Math.max(r.left + r.width / 2 - w / 2, 6), innerWidth - w - 6)}px`;
-  pop.style.top = `${r.top - h - 8 < 6 ? r.bottom + 8 : r.top - h - 8}px`;
+  const sa = TURN.safe(), L = sa.left + 6, T = sa.top + 6, R = TURN.w - sa.right - 6; // clear of the camera and screen edges
+  pop.style.left = `${Math.min(Math.max(r.left + r.width / 2 - w / 2, L), R - w)}px`;
+  pop.style.top = `${r.top - h - 8 < T ? r.bottom + 8 : r.top - h - 8}px`;
 }
 
 document.addEventListener('click', e => {

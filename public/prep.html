@@ -1066,16 +1066,18 @@ function renderPop() {
   }
   pop.style.width = pop.style.height = pop.style.maxWidth = pop.style.minHeight = '';
   if (!anchor) return;
-  const a = anchor.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight, vw = TURN.w, vh = TURN.h, g = 6;
+  // Keep clear of the screen edges and of the camera / status bar / home bar
+  const a = anchor.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight, g = 6, sa = TURN.safe();
+  const L = sa.left + g, T = sa.top + g, R = TURN.w - sa.right - g, B = TURN.h - sa.bottom - g;
   let x, y;
-  if (place === 'right') { x = a.right + g; y = Math.min(a.top, vh - h - g); }
+  if (place === 'right') { x = a.right + g; y = Math.min(a.top, B - h); }
   else {
-    x = Math.min(Math.max(a.left + a.width / 2 - w / 2, g), vw - w - g);
+    x = a.left + a.width / 2 - w / 2;
     y = place === 'below' ? a.bottom + g : a.top - h - g;
-    if (y + h > vh - g) y = a.top - h - g;   // flip up if no room below
-    if (y < g) y = Math.min(a.bottom + g, vh - h - g);
+    if (y + h > B) y = a.top - h - g;   // flip up if no room below
+    if (y < T) y = Math.min(a.bottom + g, B - h);
   }
-  pop.style.left = `${x}px`; pop.style.top = `${Math.max(g, y)}px`;
+  pop.style.left = `${Math.min(Math.max(x, L), R - w)}px`; pop.style.top = `${Math.max(T, y)}px`;
 }
 
 /* ---------- Actions ---------- */

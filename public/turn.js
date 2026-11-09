@@ -34,7 +34,16 @@
   };
   Document.prototype.elementFromPoint = function (x, y) { return on ? raw.pick.call(this, H() - y, x) : raw.pick.call(this, x, y); };
   // Page size in landscape terms (use instead of innerWidth/innerHeight)
-  window.TURN = { get w() { return on ? sh() : sw(); }, get h() { return on ? sw() : sh(); }, get on() { return on; } };
+  // safe(): space to keep clear on each page edge (camera, status bar, home bar), in page terms
+  let probe;
+  const safe = () => {
+    if (!probe) { probe = document.createElement('div');
+      probe.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none;width:0;height:0;padding:var(--sa-top,env(safe-area-inset-top)) var(--sa-right,env(safe-area-inset-right)) var(--sa-bottom,env(safe-area-inset-bottom)) var(--sa-left,env(safe-area-inset-left))';
+      (document.body || html).appendChild(probe); }
+    const c = getComputedStyle(probe);
+    return { top: parseFloat(c.paddingTop) || 0, right: parseFloat(c.paddingRight) || 0, bottom: parseFloat(c.paddingBottom) || 0, left: parseFloat(c.paddingLeft) || 0 };
+  };
+  window.TURN = { get w() { return on ? sh() : sw(); }, get h() { return on ? sw() : sh(); }, get on() { return on; }, safe };
 
   const css = document.createElement('style');
   css.textContent = `
